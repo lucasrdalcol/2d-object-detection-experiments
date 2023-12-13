@@ -6,7 +6,7 @@ import os
 # sys.path.append("/home/lucasrdalcol/Documents/repositories/2d-object-detection-experiments")
 from pprint import pprint
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.metrics import intersection_over_union
+from utils.metrics import *
 
 
 class TestIntersectionOverUnion(unittest.TestCase):
