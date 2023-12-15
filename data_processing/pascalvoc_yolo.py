@@ -38,6 +38,7 @@ class PascalVOCDatasetYOLO(torch.utils.data.Dataset):
         if self.transform:
             image, boxes = self.transform(image, boxes)
 
+        # Convert box coordinates to cell coordinates.
         label_matrix = torch.zeros((self.S, self.S, self.C + self.B * 5))
         for box in boxes:
             class_label, x, y, width, height = box.tolist()
@@ -48,10 +49,13 @@ class PascalVOCDatasetYOLO(torch.utils.data.Dataset):
             width_cell, height_cell = width * self.S, height * self.S
 
             # If no object already found for specific cell i,j, use the box and assign the box relative to the cell.
+            # Note: This means we restrict to ONE object per cell!
             if label_matrix[i, j, 20] == 0:
+                # Set that there exists an object
                 label_matrix[i, j, 20] = 1
                 box_coordinates = torch.tensor([x_cell, y_cell, width_cell, height_cell])
                 label_matrix[i, j, 21:25] = box_coordinates
+                # Set one hot encoding for class_label
                 label_matrix[i, j, class_label] = 1
 
         return image, label_matrix
