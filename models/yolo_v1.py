@@ -114,7 +114,7 @@ class YOLOv1(nn.Module):
             nn.Linear(1024 * S * S, 496), # In the original paper this should be 4096
             nn.Dropout(0.0), # In the original paper this should be 0.5
             nn.LeakyReLU(0.1),
-            nn.Linear(496, S * S * (C + B * 5)) # reshape afterwards to shape (S, S, 30) where C + B * 5 = 30
+            nn.Linear(496, S * S * (C + B * 5)) # reshape afterwards to shape (S, S, 30) where C + B * 5 = 30, for the loss function
         )
 
         return fcs
