@@ -1,5 +1,8 @@
 import torch
 from collections import Counter
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def intersection_over_union(boxes_preds, boxes_labels, box_format="midpoint"):
     """
@@ -96,7 +99,7 @@ def non_max_suppression(bboxes, iou_threshold, prob_threshold, box_format="corne
     return bboxes_after_nms
 
 
-def mean_average_precision(pred_boxes, true_boxes, iou_threshold=0.5, box_format="corners", num_classes=20):
+def mean_average_precision(pred_boxes, true_boxes, iou_threshold=0.5, box_format="midpoint", num_classes=20):
     """
     Calculates mean average precision 
 
@@ -111,7 +114,7 @@ def mean_average_precision(pred_boxes, true_boxes, iou_threshold=0.5, box_format
     Returns:
         float: mAP value across all classes given a specific IoU threshold 
     """
-    # Initialize variables
+    # List storing all AP for respective classes
     average_precisions_per_class = []
     epsilon = 1e-6
 
@@ -140,6 +143,10 @@ def mean_average_precision(pred_boxes, true_boxes, iou_threshold=0.5, box_format
         true_positives_per_class = torch.zeros((len(detections_per_class)))
         false_positives_per_class = torch.zeros((len(detections_per_class)))
         total_gt_per_class = len(gt_per_class)
+
+        # If no true boxes exists for this class, then we can safely skip
+        if total_gt_per_class == 0:
+            continue
 
         # Go through all detections in detections_per_class and check if they are true positives or false positives
         for detection_idx, detection in enumerate(detections_per_class):
@@ -181,7 +188,7 @@ def mean_average_precision(pred_boxes, true_boxes, iou_threshold=0.5, box_format
         recalls_per_class = torch.cat((torch.tensor([0]), recalls_per_class)) # [0, 0.33, 0.66, 0.66, 1, 1]
         precisions_per_class = torch.cat((torch.tensor([1]), precisions_per_class)) # [1, 1, 1, 0.66, 0.75, 0.6]
 
-        average_precisions_per_class.append(torch.trapz(precisions_per_class, recalls_per_class)) # area under precision-recall curve
+        average_precisions_per_class.append(torch.trapz(precisions_per_class, recalls_per_class)) # area under precision-recall curve, numerical integration
 
     # Calculate mean average precision across all classes
     result_map = sum(average_precisions_per_class) / len(average_precisions_per_class)

@@ -91,3 +91,5 @@ class YOLOv1Loss(nn.Module):
             + self.lambda_noobj * no_object_loss # Fourth row of loss in paper.
             + class_loss # Fifth row of loss in paper.
         )
+
+        return loss

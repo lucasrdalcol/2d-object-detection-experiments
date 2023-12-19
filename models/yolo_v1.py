@@ -119,11 +119,3 @@ class YOLOv1(nn.Module):
 
         return fcs
 
-# Test the model to check if everything works fine and the output is what we expect.
-def test(split_size=7, num_boxes=2, num_classes=20):
-    model = YOLOv1(split_size=split_size, num_boxes=num_boxes, num_classes=num_classes)
-    x = torch.randn((2, 3, 448, 448))
-    model_output = model(x)
-    print(model_output.shape)
-
-test()

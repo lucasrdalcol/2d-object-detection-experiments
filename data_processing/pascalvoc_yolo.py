@@ -4,7 +4,7 @@ import sys
 import pandas as pd
 from PIL import Image
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.metrics import *
+from utils.metrics import non_max_suppression, intersection_over_union, mean_average_precision
 
 
 class PascalVOCDatasetYOLO(torch.utils.data.Dataset):
