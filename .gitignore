@@ -182,3 +182,4 @@ cython_debug/
 
 .python-version
 data/*
+trained_models/*

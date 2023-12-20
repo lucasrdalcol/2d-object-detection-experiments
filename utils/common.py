@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -35,7 +36,8 @@ class Compose(object):
                 img, bboxes = t(img), bboxes
 
         return img, bboxes
-    
+
+
 def seed_everything(seed=123):
     """
     Seeds basic parameters for reproductibility of results.
@@ -66,3 +68,29 @@ def seed_everything(seed=123):
 
     # Set seed for all devices (GPU and CPU) - faster but not deterministic
     torch.backends.cudnn.benchmark = True
+
+
+def save_checkpoint(state, filename="my_checkpoint.pth.tar"):
+    """
+    Save the model checkpoint to a file.
+
+    Args:
+        state (dict): The state dictionary containing the model's state.
+        filename (str): The name of the file to save the checkpoint to. Default is "my_checkpoint.pth.tar".
+    """
+    print("=> Saving checkpoint")
+    torch.save(state, filename)
+
+
+def load_checkpoint(checkpoint, model, optimizer):
+    """
+    Loads the model and optimizer states from a checkpoint.
+
+    Args:
+        checkpoint (dict): The checkpoint containing the model and optimizer states.
+        model (nn.Module): The model to load the state_dict into.
+        optimizer (torch.optim.Optimizer): The optimizer to load the state_dict into.
+    """
+    print("=> Loading checkpoint")
+    model.load_state_dict(checkpoint["state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer"])

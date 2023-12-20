@@ -4,8 +4,10 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.metrics import non_max_suppression
+from utils.metrics import *
+
 
 def plot_image(image, boxes):
     """
@@ -47,6 +49,7 @@ def plot_image(image, boxes):
         ax.add_patch(rect)
 
     plt.show()
+
 
 def get_bboxes(
     loader,
@@ -99,8 +102,7 @@ def get_bboxes(
                 box_format=box_format,
             )
 
-
-            #if batch_idx == 0 and idx == 0:
+            # if batch_idx == 0 and idx == 0:
             #    plot_image(x[idx].permute(1,2,0).to("cpu"), nms_boxes)
             #    print(nms_boxes)
 
@@ -117,6 +119,30 @@ def get_bboxes(
     model.train()
     return all_pred_boxes, all_true_boxes
 
+
+def cellboxes_to_boxes(out, S=7):
+    """
+    Convert cellboxes to bounding boxes.
+
+    Args:
+        out (Tensor): The output tensor containing cellboxes.
+        S (int): The number of cells in each dimension.
+
+    Returns:
+        List[List[List[float]]]: A list of bounding boxes for each example.
+    """
+    converted_pred = convert_cellboxes(out).reshape(out.shape[0], S * S, -1)
+    converted_pred[..., 0] = converted_pred[..., 0].long()
+    all_bboxes = []
+
+    for ex_idx in range(out.shape[0]):
+        bboxes = []
+
+        for bbox_idx in range(S * S):
+            bboxes.append([x.item() for x in converted_pred[ex_idx, bbox_idx, :]])
+        all_bboxes.append(bboxes)
+
+    return all_bboxes
 
 
 def convert_cellboxes(predictions, S=7):
@@ -170,53 +196,3 @@ def convert_cellboxes(predictions, S=7):
     )
 
     return converted_preds
-
-
-def cellboxes_to_boxes(out, S=7):
-    """
-    Convert cellboxes to bounding boxes.
-
-    Args:
-        out (Tensor): The output tensor containing cellboxes.
-        S (int): The number of cells in each dimension.
-
-    Returns:
-        List[List[List[float]]]: A list of bounding boxes for each example.
-    """
-    converted_pred = convert_cellboxes(out).reshape(out.shape[0], S * S, -1)
-    converted_pred[..., 0] = converted_pred[..., 0].long()
-    all_bboxes = []
-
-    for ex_idx in range(out.shape[0]):
-        bboxes = []
-
-        for bbox_idx in range(S * S):
-            bboxes.append([x.item() for x in converted_pred[ex_idx, bbox_idx, :]])
-        all_bboxes.append(bboxes)
-
-    return all_bboxes
-
-def save_checkpoint(state, filename="my_checkpoint.pth.tar"):
-    """
-    Save the model checkpoint to a file.
-
-    Args:
-        state (dict): The state dictionary containing the model's state.
-        filename (str): The name of the file to save the checkpoint to. Default is "my_checkpoint.pth.tar".
-    """
-    print("=> Saving checkpoint")
-    torch.save(state, filename)
-
-
-def load_checkpoint(checkpoint, model, optimizer):
-    """
-    Loads the model and optimizer states from a checkpoint.
-
-    Args:
-        checkpoint (dict): The checkpoint containing the model and optimizer states.
-        model (nn.Module): The model to load the state_dict into.
-        optimizer (torch.optim.Optimizer): The optimizer to load the state_dict into.
-    """
-    print("=> Loading checkpoint")
-    model.load_state_dict(checkpoint["state_dict"])
-    optimizer.load_state_dict(checkpoint["optimizer"])
