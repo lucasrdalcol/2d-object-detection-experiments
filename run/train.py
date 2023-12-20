@@ -41,14 +41,14 @@ def main():
         load_checkpoint(torch.load(cfg.LOAD_MODEL_FILENAME), model, optimizer)
 
     train_dataset = PascalVOCDatasetYOLO(
-        os.path.join(cfg.PROJECT_DIR, "data/PascalVOC_YOLO/8examples.csv"),
+        os.path.join(cfg.PROJECT_DIR, "data/PascalVOC_YOLO/100examples.csv"),
         img_dir=cfg.IMG_DIR,
         label_dir=cfg.LABEL_DIR,
         transform=transform,
     )
 
-    test_dataset = PascalVOCDatasetYOLO(
-        os.path.join(cfg.PROJECT_DIR, "data/PascalVOC_YOLO/test.csv"),
+    val_dataset = PascalVOCDatasetYOLO(
+        os.path.join(cfg.PROJECT_DIR, "data/PascalVOC_YOLO/8examples.csv"),
         img_dir=cfg.IMG_DIR,
         label_dir=cfg.LABEL_DIR,
         transform=transform,
@@ -63,13 +63,13 @@ def main():
         drop_last=False,
     )
 
-    test_dataloader = DataLoader(
-        dataset=test_dataset,
+    val_dataloader = DataLoader(
+        dataset=val_dataset,
         batch_size=cfg.BATCH_SIZE,
         num_workers=cfg.NUM_WORKERS,
         pin_memory=cfg.PIN_MEMORY,
         shuffle=True,
-        drop_last=True,
+        drop_last=False,
     )
 
     # Train the model
@@ -78,30 +78,44 @@ def main():
         print("=" * 50)
 
         # Each epoch has a training and validation phase
-        for phase in ["train"]:
-            print("-" * 20)
-            print(f"{phase} phase - Epoch {epoch + 1}/{cfg.EPOCHS}")
-            print("-" * 20)
+        # Training phase
+        print("-" * 20)
+        print(f"Training phase - Epoch {epoch + 1}/{cfg.EPOCHS}")
+        print("-" * 20)
+        train_epoch(train_dataloader, model, optimizer, loss_fn)
+        train_pred_boxes, train_target_boxes = get_bboxes(
+            train_dataloader,
+            model,
+            iou_threshold=0.5,
+            threshold=0.4,
+        ) # Get the predictions and targets bboxes to compute mAP for the training dataset
+        train_mean_avg_prec = mean_average_precision(
+            train_pred_boxes,
+            train_target_boxes,
+            iou_threshold=0.5,
+            box_format="midpoint",
+        ) # Compute mAP for the training data
+        print(f"Train mAP: {train_mean_avg_prec}")
 
-            train_epoch(train_dataloader, model, optimizer, loss_fn)
+        # Validation phase
+        print("-" * 20)
+        print(f"Validation phase - Epoch {epoch + 1}/{cfg.EPOCHS}")
+        print("-" * 20)
+        validate_epoch(val_dataloader, model, loss_fn)
+        val_pred_boxes, val_target_boxes = get_bboxes(
+            val_dataloader,
+            model,
+            iou_threshold=0.5,
+            threshold=0.4,
+        )
+        val_mean_avg_prec = mean_average_precision(
+            val_pred_boxes,
+            val_target_boxes,
+            iou_threshold=0.5,
+            box_format="midpoint",
+        )
+        print(f"Val mAP: {val_mean_avg_prec}")
 
-            # Get the predictions and targets bboxes to compute mAP for the training dataset
-            train_pred_boxes, train_target_boxes = get_bboxes(
-                train_dataloader,
-                model,
-                iou_threshold=0.5,
-                threshold=0.4,
-            )
-
-            # Compute mAP for the training data
-            train_mean_avg_prec = mean_average_precision(
-                train_pred_boxes,
-                train_target_boxes,
-                iou_threshold=0.5,
-                box_format="midpoint",
-            )
-
-            print(f"Train mAP: {train_mean_avg_prec}")
         print("=" * 50)
 
     # Print the time it took to train the model
@@ -125,7 +139,7 @@ def main():
     # Visualize results
     if cfg.VISUALIZE_RESULTS:
         print(f"Visualizing results...")
-        for inputs_x, labels_y in train_dataloader:
+        for inputs_x, labels_y in val_dataloader:
             inputs_x = inputs_x.to(cfg.DEVICE)
             for idx in range(8):
                 bboxes = cellboxes_to_boxes(model(inputs_x))

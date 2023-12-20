@@ -101,7 +101,7 @@ def non_max_suppression(bboxes, iou_threshold, prob_threshold, box_format="corne
 
 def mean_average_precision(pred_boxes, true_boxes, iou_threshold=0.5, box_format="midpoint", num_classes=20):
     """
-    Calculates mean average precision 
+    Calculates mean average precision for a specific IoU threshold.
 
     Parameters:
         pred_boxes (list): list of lists containing all bboxes with each bboxes
