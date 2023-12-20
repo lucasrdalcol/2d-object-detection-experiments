@@ -31,6 +31,7 @@ class PascalVOCDatasetYOLO(torch.utils.data.Dataset):
                 boxes.append([class_label, x, y, width, height])
 
         img_path = os.path.join(self.img_dir, self.annotations.iloc[index, 0])
+        img_name = self.annotations.iloc[index, 0]
         image = Image.open(img_path)
         boxes = torch.tensor(boxes)
 
@@ -57,4 +58,4 @@ class PascalVOCDatasetYOLO(torch.utils.data.Dataset):
                 # Set one hot encoding for class_label
                 label_matrix[i, j, class_label] = 1
 
-        return image, label_matrix
+        return image, label_matrix, img_name

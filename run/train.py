@@ -48,7 +48,7 @@ def main():
     )
 
     val_dataset = PascalVOCDatasetYOLO(
-        os.path.join(cfg.PROJECT_DIR, "data/PascalVOC_YOLO/8examples.csv"),
+        os.path.join(cfg.PROJECT_DIR, "data/PascalVOC_YOLO/100examples.csv"),
         img_dir=cfg.IMG_DIR,
         label_dir=cfg.LABEL_DIR,
         transform=transform,
@@ -88,13 +88,13 @@ def main():
             model,
             iou_threshold=0.5,
             threshold=0.4,
-        ) # Get the predictions and targets bboxes to compute mAP for the training dataset
+        )  # Get the predictions and targets bboxes to compute mAP for the training dataset
         train_mean_avg_prec = mean_average_precision(
             train_pred_boxes,
             train_target_boxes,
             iou_threshold=0.5,
             box_format="midpoint",
-        ) # Compute mAP for the training data
+        )  # Compute mAP for the training data
         print(f"Train mAP: {train_mean_avg_prec}")
 
         # Validation phase
@@ -136,22 +136,48 @@ def main():
             os.path.join(cfg.PROJECT_DIR, f"trained_models/{cfg.SAVE_MODEL_FILENAME}"),
         )
 
-    # Visualize results
-    if cfg.VISUALIZE_RESULTS:
-        print(f"Visualizing results...")
-        for inputs_x, labels_y in val_dataloader:
+    # Visualize and/or save comparison results
+    if cfg.VISUALIZE_RESULTS or cfg.SAVE_RESULTS:
+        if cfg.SAVE_RESULTS:
+            print(f"Saving validation results...")
+        if cfg.VISUALIZE_RESULTS:
+            print(f"Visualizing validation results...")
+
+        for inputs_x, labels_y, img_name in val_dataloader:
             inputs_x = inputs_x.to(cfg.DEVICE)
-            for idx in range(8):
-                bboxes = cellboxes_to_boxes(model(inputs_x))
-                bboxes = non_max_suppression(
-                    bboxes[idx],
+            labels_y = labels_y.to(cfg.DEVICE)
+            for idx in range(inputs_x.shape[0]):
+                pred_bboxes = cellboxes_to_boxes(model(inputs_x))
+                true_bboxes = cellboxes_to_boxes(labels_y)
+                pred_bboxes_idx = non_max_suppression(
+                    pred_bboxes[idx],
                     iou_threshold=0.5,
                     prob_threshold=0.4,
                     box_format="midpoint",
                 )
-                plot_image(inputs_x[idx].permute(1, 2, 0).to("cpu"), bboxes)
-
-            break
+                true_bboxes_idx = true_bboxes[idx]
+                img_name_idx = img_name[idx]
+                plt = plot_comparison_image(
+                    inputs_x[idx].permute(1, 2, 0).to("cpu"),
+                    img_name_idx,
+                    pred_bboxes_idx,
+                    true_bboxes_idx,
+                )
+                if cfg.SAVE_RESULTS:
+                    os.makedirs(
+                        os.path.join(
+                            cfg.PROJECT_DIR, f"results/{cfg.SAVE_RESULTS_FOLDER}"
+                        ),
+                        exist_ok=cfg.OVERWRITE_RESULTS_FOLDER,
+                    )
+                    plt.savefig(
+                        os.path.join(
+                            cfg.PROJECT_DIR,
+                            f"results/{cfg.SAVE_RESULTS_FOLDER}/{img_name_idx.split('.')[0]}.png",
+                        )
+                    )
+                if cfg.VISUALIZE_RESULTS:
+                    plt.show()
 
 
 if __name__ == "__main__":

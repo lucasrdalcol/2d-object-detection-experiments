@@ -15,7 +15,7 @@ def train_epoch(train_dataloader, model, optimizer, loss_fn):
     losses = []
 
     # Iterate over the training data
-    for batch_idx, (inputs_x, labels_y) in enumerate(train_dataloader_loop):
+    for batch_idx, (inputs_x, labels_y, _) in enumerate(train_dataloader_loop):
         inputs_x, labels_y = inputs_x.to(cfg.DEVICE), labels_y.to(
             cfg.DEVICE
         )  # Move data to device (GPU if available)
@@ -44,7 +44,7 @@ def validate_epoch(val_dataloader, model, loss_fn):
 
     # Iterate over the validation data
     with torch.no_grad():  # disable gradient calculation
-        for batch_idx, (inputs_x, labels_y) in enumerate(val_dataloader_loop):
+        for batch_idx, (inputs_x, labels_y, _) in enumerate(val_dataloader_loop):
             # forward pass: Feed inputs to the model and compute loss.
             # No need to compute gradients in validation phase (backpropagation)
             inputs_x, labels_y = inputs_x.to(cfg.DEVICE), labels_y.to(
@@ -93,7 +93,7 @@ def get_bboxes(
     model.eval()
     train_idx = 0
 
-    for batch_idx, (inputs_x, labels_y) in enumerate(dataloader):
+    for batch_idx, (inputs_x, labels_y, _) in enumerate(dataloader):
         inputs_x = inputs_x.to(device)
         labels_y = labels_y.to(device)
 
