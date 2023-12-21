@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.metrics import *
 
 
-def plot_comparison_image(image, img_name, pred_boxes, true_boxes, save=False, save_path=None):
+def plot_comparison_image(image, filename, pred_boxes, true_boxes):
     """
     Plots predicted and true bounding boxes on the same image side by side.
 
@@ -27,7 +27,7 @@ def plot_comparison_image(image, img_name, pred_boxes, true_boxes, save=False, s
 
     # Create figure and axes
     fig, (ax1, ax2) = plt.subplots(1, 2)
-    fig.suptitle(img_name)
+    fig.suptitle(filename)
     # Display the image
     ax1.imshow(im)
     ax1.set_title("Predicted bboxes")

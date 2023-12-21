@@ -69,6 +69,7 @@ def get_bboxes(
     pred_format="cells",
     box_format="midpoint",
     device="cuda",
+    progress_bar=False
 ):
     """
     Get bounding boxes for object detection predictions.
@@ -92,8 +93,10 @@ def get_bboxes(
     # make sure model is in eval before get bboxes
     model.eval()
     train_idx = 0
+    if progress_bar:
+        dataloader_loop = tqdm(dataloader)
 
-    for batch_idx, (inputs_x, labels_y, _) in enumerate(dataloader):
+    for batch_idx, (inputs_x, labels_y, _) in enumerate(dataloader_loop if progress_bar else dataloader):
         inputs_x = inputs_x.to(device)
         labels_y = labels_y.to(device)
 

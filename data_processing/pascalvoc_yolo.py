@@ -7,8 +7,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class PascalVOCDatasetYOLO(torch.utils.data.Dataset):
-    def __init__(self, csv_file, img_dir, label_dir, split_size=7, num_boxes=2, num_classes=20, transform=None):
+    def __init__(self, csv_file, img_dir, label_dir, split_size=7, num_boxes=2, num_classes=20, transform=None, decimation_factor=None):
         self.annotations = pd.read_csv(csv_file)
+        if decimation_factor is not None:
+            self.annotations = self.annotations.iloc[::decimation_factor, :]
         self.img_dir = img_dir
         self.label_dir = label_dir
         self.S = split_size
@@ -31,7 +33,7 @@ class PascalVOCDatasetYOLO(torch.utils.data.Dataset):
                 boxes.append([class_label, x, y, width, height])
 
         img_path = os.path.join(self.img_dir, self.annotations.iloc[index, 0])
-        img_name = self.annotations.iloc[index, 0]
+        filename = self.annotations.iloc[index, 0]
         image = Image.open(img_path)
         boxes = torch.tensor(boxes)
 
@@ -58,4 +60,4 @@ class PascalVOCDatasetYOLO(torch.utils.data.Dataset):
                 # Set one hot encoding for class_label
                 label_matrix[i, j, class_label] = 1
 
-        return image, label_matrix, img_name
+        return image, label_matrix, filename
