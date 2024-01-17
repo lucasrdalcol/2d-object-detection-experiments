@@ -5,6 +5,8 @@ import matplotlib.patches as patches
 import sys
 import os
 
+import wandb
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.metrics import *
 
@@ -71,5 +73,35 @@ def plot_comparison_image(image, filename, pred_boxes, true_boxes):
         # Add the patch to the Axes
         ax2.add_patch(rect)
 
-
     return plt
+
+
+def wandb_bounding_boxes(raw_image, filename, bboxes, class_id_to_label):
+    all_boxes = []
+    # plot each bounding box for this image
+    for box in bboxes:
+        if box[1] == 0.0:
+            continue
+        # get coordinates and labels
+        box_data = {
+            "position": {
+                "middle": [box[2], box[3]],
+                "width": box[4],
+                "height": box[5],
+            },
+            "class_id": int(box[0]),
+            # optionally caption each box with its class and score
+            "box_caption": "%s (%.1f)" % (class_id_to_label[box[0]], box[1] * 100),
+            "scores": {"score": box[1] * 100},
+        }
+        all_boxes.append(box_data)
+
+    # log to wandb: raw image, predictions, and dictionary of class labels for each class id
+    box_image = wandb.Image(
+        raw_image,
+        caption=filename,
+        boxes={
+            "predictions": {"box_data": all_boxes, "class_labels": class_id_to_label}
+        },
+    )
+    return box_image

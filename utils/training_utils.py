@@ -3,8 +3,10 @@ import torch
 import sys
 import os
 
+import wandb
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import config.yolov1_config as cfg
+import config.yolov1_train_config as cfg
 from utils.metrics import *
 
 
@@ -36,6 +38,8 @@ def train_epoch(train_dataloader, model, optimizer, loss_fn):
     mean_loss = sum(losses) / len(losses)
     print(f"Train mean loss: {mean_loss}")
 
+    return mean_loss
+
 
 def validate_epoch(val_dataloader, model, loss_fn):
     val_dataloader_loop = tqdm(val_dataloader)
@@ -59,6 +63,8 @@ def validate_epoch(val_dataloader, model, loss_fn):
     # Compute mean loss over all batches of the validation data
     mean_loss = sum(losses) / len(losses)
     print(f"Val mean loss: {mean_loss}")
+
+    return mean_loss
 
 
 def get_bboxes(
