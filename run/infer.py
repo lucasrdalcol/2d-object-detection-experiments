@@ -2,6 +2,7 @@
 
 import shutil
 import torch
+import torchinfo
 import torchvision.transforms as transforms
 import torch.optim as optim
 import torchvision.transforms.functional as FT
@@ -14,6 +15,7 @@ import os
 
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 from models.yolo_v1 import *
+from models.yolo_v1_pre_trained import *
 from data_processing.pascalvoc_yolo import *
 from utils.metrics import *
 from utils.visualization import *
@@ -25,22 +27,28 @@ import config.yolov1_infer_config as cfg
 # Seed for reproducibility
 seed_everything(cfg.SEED)
 
-# transforms for the training data
-transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor()])
-
 
 def main():
     # Load model, optimizer and loss function
-    model = YOLOv1(split_size=cfg.SPLIT_SIZE, num_boxes=cfg.NUM_BOXES, num_classes=cfg.NUM_CLASSES).to(cfg.DEVICE)
-    model.load_state_dict(torch.load(os.path.join(cfg.MODELS_DIR, cfg.LOAD_MODEL_FILENAME)))
+    model = YOLOv1(
+        split_size=cfg.SPLIT_SIZE, num_boxes=cfg.NUM_BOXES, num_classes=cfg.NUM_CLASSES
+    ).to(cfg.DEVICE)
+    model.load_state_dict(
+        torch.load(os.path.join(cfg.MODELS_DIR, cfg.LOAD_MODEL_FILENAME))
+    )
+
+    # Print summary of the model
+    if cfg.PRINT_NN_SUMMARY:
+        print(model)
+        torchinfo.summary(model, input_size=(cfg.BATCH_SIZE, 3, cfg.INPUT_SIZE[0], cfg.INPUT_SIZE[1]), col_names=("input_size", "output_size", "num_params", "kernel_size", "mult_adds"), verbose=1)
 
     # Load the training and validation datasets
     test_dataset = PascalVOCDatasetYOLO(
         os.path.join(cfg.DATASET_DIR, "test.csv"),
         img_dir=os.path.join(cfg.DATASET_DIR, "images"),
         label_dir=os.path.join(cfg.DATASET_DIR, "labels"),
-        transform=transform,
-        decimation_factor=cfg.DECIMATION_FACTOR
+        transform=cfg.TRANSFORM,
+        decimation_factor=cfg.DECIMATION_FACTOR,
     )
 
     # Create training and validation dataloaders
@@ -50,7 +58,7 @@ def main():
         num_workers=cfg.NUM_WORKERS,
         pin_memory=cfg.PIN_MEMORY,
         shuffle=True,
-        drop_last=False
+        drop_last=False,
     )
 
     # Infer the model
@@ -64,13 +72,10 @@ def main():
         iou_threshold=0.5,
         threshold=0.4,
         device=cfg.DEVICE,
-        progress_bar=True
+        progress_bar=True,
     )  # Get the predictions and targets bboxes to compute mAP for the test dataset
     test_mean_avg_prec = mean_average_precision(
-        test_pred_boxes,
-        test_target_boxes,
-        iou_threshold=0.5,
-        box_format="midpoint"
+        test_pred_boxes, test_target_boxes, iou_threshold=0.5, box_format="midpoint"
     )  # Compute mAP for the test data for inference
     print(f"Inference mAP: {test_mean_avg_prec}")
 
@@ -87,17 +92,11 @@ def main():
     if cfg.VISUALIZE_RESULTS or cfg.SAVE_RESULTS:
         if cfg.SAVE_RESULTS:
             print(f"Saving inference results...")
-            results_folder_path = os.path.join(
-                cfg.RESULTS_DIR, cfg.SAVE_RESULTS_FOLDER
-            )
+            results_folder_path = os.path.join(cfg.RESULTS_DIR, cfg.SAVE_RESULTS_FOLDER)
             if not os.path.exists(results_folder_path):
-                os.makedirs(
-                    results_folder_path
-                )
+                os.makedirs(results_folder_path)
             else:
-                shutil.rmtree(
-                    results_folder_path
-                )  # Removes all the subdirectories!
+                shutil.rmtree(results_folder_path)  # Removes all the subdirectories!
                 os.makedirs(results_folder_path)
         if cfg.VISUALIZE_RESULTS:
             print(f"Visualizing inference results...")
@@ -124,7 +123,8 @@ def main():
                 )
                 if cfg.SAVE_RESULTS:
                     plt.savefig(
-                        os.path.join(results_folder_path,
+                        os.path.join(
+                            results_folder_path,
                             f"{filename_idx.split('.')[0]}.png",
                         )
                     )

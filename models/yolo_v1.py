@@ -5,7 +5,7 @@ import torch.nn as nn
 architecture_config = [
     # conv config tuple: (kernel_size, number of filters, stride, padding)
     (7, 64, 2, 3),
-    "M", # MaxPool2d(kernel_size=2, stride=2)
+    "M",  # MaxPool2d(kernel_size=2, stride=2)
     (3, 192, 1, 1),
     "M",
     (1, 128, 1, 0),
@@ -62,7 +62,7 @@ class YOLOv1(nn.Module):
         x = torch.flatten(x, start_dim=1)
         x = self.fcs(x)
         return x
-    
+
     # This function creates the convolutional layers
     # The functions starting with _ are internal functions only used by the class.
     # Cleaver way of creating blocks of layers, such as conv blocks and fc blocks.
@@ -72,38 +72,50 @@ class YOLOv1(nn.Module):
 
         for x in architecture:
             if type(x) == tuple:
-                layers += [CNNBlock(in_channels, 
-                                    out_channels=x[1], 
-                                    kernel_size=x[0], 
-                                    stride=x[2], 
-                                    padding=x[3])]
+                layers += [
+                    CNNBlock(
+                        in_channels,
+                        out_channels=x[1],
+                        kernel_size=x[0],
+                        stride=x[2],
+                        padding=x[3],
+                    )
+                ]
                 in_channels = x[1]
 
             elif type(x) == str:
                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
 
             elif type(x) == list:
-                conv1 = x[0] # tuple
-                conv2 = x[1] # tuple
-                num_repeats = x[2] # integer
+                conv1 = x[0]  # tuple
+                conv2 = x[1]  # tuple
+                num_repeats = x[2]  # integer
 
                 for _ in range(num_repeats):
-                    layers += [CNNBlock(in_channels, 
-                                        out_channels=conv1[1], 
-                                        kernel_size=conv1[0], 
-                                        stride=conv1[2], 
-                                        padding=conv1[3])]
-                    
-                    layers += [CNNBlock(in_channels=conv1[1], 
-                                        out_channels=conv2[1], 
-                                        kernel_size=conv2[0], 
-                                        stride=conv2[2], 
-                                        padding=conv2[3])]
-                    
+                    layers += [
+                        CNNBlock(
+                            in_channels,
+                            out_channels=conv1[1],
+                            kernel_size=conv1[0],
+                            stride=conv1[2],
+                            padding=conv1[3],
+                        )
+                    ]
+
+                    layers += [
+                        CNNBlock(
+                            in_channels=conv1[1],
+                            out_channels=conv2[1],
+                            kernel_size=conv2[0],
+                            stride=conv2[2],
+                            padding=conv2[3],
+                        )
+                    ]
+
                     in_channels = conv2[1]
 
-        return nn.Sequential(*layers) # * unpacks the list to give to the function
-    
+        return nn.Sequential(*layers)  # * unpacks the list to give to the function
+
     # This function creates the fully connected layers
     # The functions starting with _ are internal functions only used by the class.
     def _create_fcs(self, split_size, num_boxes, num_classes):
@@ -111,11 +123,12 @@ class YOLOv1(nn.Module):
         # Way of doing it with nn.Sequential:
         fcs = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(1024 * S * S, 496), # In the original paper this should be 4096
-            nn.Dropout(0.0), # In the original paper this should be 0.5
+            nn.Linear(1024 * S * S, 496),  # In the original paper this should be 4096
+            nn.Dropout(0.0),  # In the original paper this should be 0.5
             nn.LeakyReLU(0.1),
-            nn.Linear(496, S * S * (C + B * 5)) # reshape afterwards to shape (S, S, 30) where C + B * 5 = 30, for the loss function
+            nn.Linear(
+                496, S * S * (C + B * 5)
+            ),  # reshape afterwards to shape (S, S, 30) where C + B * 5 = 30, for the loss function
         )
 
         return fcs
-

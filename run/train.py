@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 import time
 import wandb
 import random
+import torchinfo
 
 import sys
 import os
@@ -17,6 +18,7 @@ import importlib.util
 
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 from models.yolo_v1 import *
+from models.yolo_v1_pre_trained import *
 from data_processing.pascalvoc_yolo import *
 from utils.metrics import *
 from utils.visualization import *
@@ -28,26 +30,42 @@ import config.yolov1_train_config as cfg
 # Seed for reproducibility
 seed_everything(cfg.SEED)
 
-# transforms for the training data
-transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor()])
-
 
 def main():
-    # Config dict
-    spec = importlib.util.spec_from_file_location("config", "../config/yolov1_train_config.py")
+    # Config dict creation
+    spec = importlib.util.spec_from_file_location(
+        "config", "../config/yolov1_train_config.py"
+    )
     config_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(config_module)
-
-    config_dict = {name: getattr(config_module, name) for name in dir(config_module) if not name.startswith("__") and name.isupper()}
+    config_dict = {
+        name: getattr(config_module, name)
+        for name in dir(config_module)
+        if not name.startswith("__") and name.isupper()
+    }
 
     # Load model, optimizer and loss function
-    model = YOLOv1(
-        split_size=cfg.SPLIT_SIZE, num_boxes=cfg.NUM_BOXES, num_classes=cfg.NUM_CLASSES
-    ).to(cfg.DEVICE)
+    if not cfg.PRE_TRAINED_CNN:
+        model = YOLOv1(
+            split_size=cfg.SPLIT_SIZE,
+            num_boxes=cfg.NUM_BOXES,
+            num_classes=cfg.NUM_CLASSES,
+        ).to(cfg.DEVICE)
+    else:
+        model = YOLOv1PreTrained(
+            split_size=cfg.SPLIT_SIZE,
+            num_boxes=cfg.NUM_BOXES,
+            num_classes=cfg.NUM_CLASSES,
+        ).to(cfg.DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=cfg.LEARNING_RATE, weight_decay=cfg.WEIGHT_DECAY
     )
     loss_fn = YOLOv1Loss()
+
+    # Print summary of the model
+    if cfg.PRINT_NN_SUMMARY:
+        print(model)
+        torchinfo.summary(model, input_size=(cfg.BATCH_SIZE, 3, cfg.INPUT_SIZE[0], cfg.INPUT_SIZE[1]), col_names=("input_size", "output_size", "num_params", "kernel_size", "mult_adds"), verbose=1)
 
     # start a new wandb run to track this script
     wandb.init(
@@ -71,7 +89,7 @@ def main():
         os.path.join(cfg.DATASET_DIR, "8examples.csv"),
         img_dir=os.path.join(cfg.DATASET_DIR, "images"),
         label_dir=os.path.join(cfg.DATASET_DIR, "labels"),
-        transform=transform,
+        transform=cfg.TRANSFORM,
         decimation_factor=cfg.DECIMATION_FACTOR,
     )
 
@@ -79,7 +97,7 @@ def main():
         os.path.join(cfg.DATASET_DIR, "8examples.csv"),
         img_dir=os.path.join(cfg.DATASET_DIR, "images"),
         label_dir=os.path.join(cfg.DATASET_DIR, "labels"),
-        transform=transform,
+        transform=cfg.TRANSFORM,
         decimation_factor=cfg.DECIMATION_FACTOR,
     )
 
@@ -178,9 +196,7 @@ def main():
     if cfg.VISUALIZE_RESULTS or cfg.SAVE_RESULTS:
         if cfg.SAVE_RESULTS:
             print(f"Saving validation results...")
-            results_folder_path = os.path.join(
-                cfg.RESULTS_DIR, cfg.SAVE_RESULTS_FOLDER
-            )
+            results_folder_path = os.path.join(cfg.RESULTS_DIR, cfg.SAVE_RESULTS_FOLDER)
             if not os.path.exists(results_folder_path):
                 os.makedirs(results_folder_path)
             else:

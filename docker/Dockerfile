@@ -6,7 +6,7 @@ COPY requirements.txt /tmp/
 RUN pip install --requirement /tmp/requirements.txt
 
 RUN apt-get update
-RUN apt-get install ffmpeg libsm6 libxext6  -y
+RUN apt-get install ffmpeg libsm6 libxext6 vim git -y
 
 WORKDIR /root
 
