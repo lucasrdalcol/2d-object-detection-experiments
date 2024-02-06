@@ -3,7 +3,7 @@ import sys
 import torch
 import os
 # sys.path.append("/home/lucasrdalcol/Documents/repositories/2d-object-detection-experiments")
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 from models.yolo_v1 import *
 
 

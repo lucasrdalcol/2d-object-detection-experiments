@@ -2,7 +2,7 @@ import torch
 from collections import Counter
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 
 def intersection_over_union(boxes_preds, boxes_labels, box_format="midpoint"):
     """

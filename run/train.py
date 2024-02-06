@@ -13,8 +13,9 @@ import random
 
 import sys
 import os
+import importlib.util
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 from models.yolo_v1 import *
 from data_processing.pascalvoc_yolo import *
 from utils.metrics import *
@@ -32,6 +33,13 @@ transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor()])
 
 
 def main():
+    # Config dict
+    spec = importlib.util.spec_from_file_location("config", "../config/yolov1_train_config.py")
+    config_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(config_module)
+
+    config_dict = {name: getattr(config_module, name) for name in dir(config_module) if not name.startswith("__") and name.isupper()}
+
     # Load model, optimizer and loss function
     model = YOLOv1(
         split_size=cfg.SPLIT_SIZE, num_boxes=cfg.NUM_BOXES, num_classes=cfg.NUM_CLASSES
@@ -45,33 +53,9 @@ def main():
     wandb.init(
         # set the wandb project where this run will be logged
         project="YOLOv1",
-        name="overfit_test",
+        # name="overfit_test",
         # track hyperparameters and run metadata
-        config={
-            "learning_rate": cfg.LEARNING_RATE,
-            "device": cfg.DEVICE,
-            "batch_size": cfg.BATCH_SIZE,
-            "weight_decay": cfg.WEIGHT_DECAY,
-            "epochs": cfg.EPOCHS,
-            "num_workers": cfg.NUM_WORKERS,
-            "pin_memory": cfg.PIN_MEMORY,
-            "split_size": cfg.SPLIT_SIZE,
-            "num_boxes": cfg.NUM_BOXES,
-            "num_classes": cfg.NUM_CLASSES,
-            "load_model_checkpoint": cfg.LOAD_MODEL_CHECKPOINT,
-            "load_model_checkpoint_filename": cfg.LOAD_MODEL_CHECKPOINT_FILENAME,
-            "save_model": cfg.SAVE_MODEL,
-            "save_model_filename": cfg.SAVE_MODEL_FILENAME,
-            "project_dir": cfg.PROJECT_DIR,
-            "img_dir": cfg.IMG_DIR,
-            "label_dir": cfg.LABEL_DIR,
-            "seed": cfg.SEED,
-            "visualize_results": cfg.VISUALIZE_RESULTS,
-            "save_results": cfg.SAVE_RESULTS,
-            "save_results_folder": cfg.SAVE_RESULTS_FOLDER,
-            "overwrite_results_folder": cfg.OVERWRITE_RESULTS_FOLDER,
-            "decimation_factor": cfg.DECIMATION_FACTOR,
-        },
+        config=config_dict,
     )
 
     wandb.watch(model)
@@ -84,17 +68,17 @@ def main():
 
     # Load the training and validation datasets
     train_dataset = PascalVOCDatasetYOLO(
-        os.path.join(cfg.PROJECT_DIR, "data/PascalVOC_YOLO/100examples.csv"),
-        img_dir=cfg.IMG_DIR,
-        label_dir=cfg.LABEL_DIR,
+        os.path.join(cfg.DATASET_DIR, "8examples.csv"),
+        img_dir=os.path.join(cfg.DATASET_DIR, "images"),
+        label_dir=os.path.join(cfg.DATASET_DIR, "labels"),
         transform=transform,
         decimation_factor=cfg.DECIMATION_FACTOR,
     )
 
     val_dataset = PascalVOCDatasetYOLO(
-        os.path.join(cfg.PROJECT_DIR, "data/PascalVOC_YOLO/100examples.csv"),
-        img_dir=cfg.IMG_DIR,
-        label_dir=cfg.LABEL_DIR,
+        os.path.join(cfg.DATASET_DIR, "8examples.csv"),
+        img_dir=os.path.join(cfg.DATASET_DIR, "images"),
+        label_dir=os.path.join(cfg.DATASET_DIR, "labels"),
         transform=transform,
         decimation_factor=cfg.DECIMATION_FACTOR,
     )
@@ -187,7 +171,7 @@ def main():
         print(f"Saving best model: {cfg.SAVE_MODEL_FILENAME}...")
         torch.save(
             model.state_dict(),
-            os.path.join(cfg.PROJECT_DIR, f"trained_models/{cfg.SAVE_MODEL_FILENAME}"),
+            os.path.join(cfg.MODELS_DIR, cfg.SAVE_MODEL_FILENAME),
         )
 
     # Visualize and/or save comparison results locally
@@ -195,7 +179,7 @@ def main():
         if cfg.SAVE_RESULTS:
             print(f"Saving validation results...")
             results_folder_path = os.path.join(
-                cfg.PROJECT_DIR, f"results/{cfg.SAVE_RESULTS_FOLDER}"
+                cfg.RESULTS_DIR, cfg.SAVE_RESULTS_FOLDER
             )
             if not os.path.exists(results_folder_path):
                 os.makedirs(results_folder_path)

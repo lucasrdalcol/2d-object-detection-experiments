@@ -7,7 +7,7 @@ import os
 
 import wandb
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 from utils.metrics import *
 
 

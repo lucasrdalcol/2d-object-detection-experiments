@@ -3,7 +3,7 @@ import os
 import sys
 import pandas as pd
 from PIL import Image
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 
 
 class PascalVOCDatasetYOLO(torch.utils.data.Dataset):

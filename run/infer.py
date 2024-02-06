@@ -12,7 +12,7 @@ import time
 import sys
 import os
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 from models.yolo_v1 import *
 from data_processing.pascalvoc_yolo import *
 from utils.metrics import *
@@ -32,13 +32,13 @@ transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor()])
 def main():
     # Load model, optimizer and loss function
     model = YOLOv1(split_size=cfg.SPLIT_SIZE, num_boxes=cfg.NUM_BOXES, num_classes=cfg.NUM_CLASSES).to(cfg.DEVICE)
-    model.load_state_dict(torch.load(os.path.join(cfg.PROJECT_DIR, f"trained_models/{cfg.LOAD_MODEL_FILENAME}")))
+    model.load_state_dict(torch.load(os.path.join(cfg.MODELS_DIR, cfg.LOAD_MODEL_FILENAME)))
 
     # Load the training and validation datasets
     test_dataset = PascalVOCDatasetYOLO(
-        os.path.join(cfg.PROJECT_DIR, "data/PascalVOC_YOLO/test.csv"),
-        img_dir=cfg.IMG_DIR,
-        label_dir=cfg.LABEL_DIR,
+        os.path.join(cfg.DATASET_DIR, "test.csv"),
+        img_dir=os.path.join(cfg.DATASET_DIR, "images"),
+        label_dir=os.path.join(cfg.DATASET_DIR, "labels"),
         transform=transform,
         decimation_factor=cfg.DECIMATION_FACTOR
     )
@@ -88,7 +88,7 @@ def main():
         if cfg.SAVE_RESULTS:
             print(f"Saving inference results...")
             results_folder_path = os.path.join(
-                cfg.PROJECT_DIR, f"results/{cfg.SAVE_RESULTS_FOLDER}"
+                cfg.RESULTS_DIR, cfg.SAVE_RESULTS_FOLDER
             )
             if not os.path.exists(results_folder_path):
                 os.makedirs(
