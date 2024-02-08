@@ -14,15 +14,15 @@ import sys
 import os
 
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
-from models.yolo_v1 import *
-from models.yolo_v1_pre_trained import *
-from data_processing.pascalvoc_yolo import *
-from utils.metrics import *
-from utils.visualization import *
-from loss.yolo_v1_loss import *
-from utils.common import *
-from utils.training_utils import *
-import config.yolov1_infer_config as cfg
+from yolov1_pascalvoc.models.yolo_v1 import *
+from yolov1_pascalvoc.models.yolo_v1_pre_trained import *
+from yolov1_pascalvoc.data_processing.pascalvoc_yolo import *
+from yolov1_pascalvoc.utils.metrics import *
+from yolov1_pascalvoc.utils.visualization import *
+from yolov1_pascalvoc.loss.yolo_v1_loss import *
+from yolov1_pascalvoc.utils.common import *
+from yolov1_pascalvoc.utils.training_utils import *
+import yolov1_pascalvoc.config.yolov1_infer_config as cfg
 
 # Seed for reproducibility
 seed_everything(cfg.SEED)

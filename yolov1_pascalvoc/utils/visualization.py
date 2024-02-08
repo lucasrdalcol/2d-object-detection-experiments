@@ -8,7 +8,7 @@ import os
 import wandb
 
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
-from utils.metrics import *
+from yolov1_pascalvoc.utils.metrics import *
 
 
 def plot_comparison_image(image, filename, pred_boxes, true_boxes):

@@ -4,7 +4,7 @@ import torch
 import os
 # sys.path.append("/home/lucasrdalcol/Documents/repositories/2d-object-detection-experiments")
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
-from models.yolo_v1 import *
+from yolov1_pascalvoc.models.yolo_v1 import *
 
 
 # Test the model to check if everything works fine and the output is what we expect.

@@ -3,7 +3,7 @@ import torch.nn as nn
 import sys
 import os
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
-from utils.metrics import *
+from yolov1_pascalvoc.utils.metrics import *
 
 class YOLOv1Loss(nn.Module):
     def __init__(self, split_size=7, num_boxes=2, num_classes=20):

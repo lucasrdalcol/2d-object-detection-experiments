@@ -6,7 +6,7 @@ import os
 # sys.path.append("/home/lucasrdalcol/Documents/repositories/2d-object-detection-experiments")
 from pprint import pprint
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
-from utils.metrics import *
+from yolov1_pascalvoc.utils.metrics import *
 
 
 class TestMeanAveragePrecision(unittest.TestCase):

@@ -6,8 +6,8 @@ import os
 import wandb
 
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
-import config.yolov1_train_config as cfg
-from utils.metrics import *
+import yolov1_pascalvoc.config.yolov1_train_config as cfg
+from yolov1_pascalvoc.utils.metrics import *
 
 
 # Train function
