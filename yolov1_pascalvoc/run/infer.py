@@ -12,6 +12,7 @@ import time
 
 import sys
 import os
+import importlib
 
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 from yolov1_pascalvoc.models.yolo_v1 import *
@@ -22,7 +23,9 @@ from yolov1_pascalvoc.utils.visualization import *
 from yolov1_pascalvoc.loss.yolo_v1_loss import *
 from yolov1_pascalvoc.utils.common import *
 from yolov1_pascalvoc.utils.training_utils import *
-import yolov1_pascalvoc.config.yolov1_infer_config as cfg
+
+import yolov1_pascalvoc.config.config_master as config_master
+cfg = importlib.import_module(config_master.CONFIG_FILE)
 
 # Seed for reproducibility
 seed_everything(cfg.SEED)
@@ -30,9 +33,18 @@ seed_everything(cfg.SEED)
 
 def main():
     # Load model, optimizer and loss function
-    model = YOLOv1(
-        split_size=cfg.SPLIT_SIZE, num_boxes=cfg.NUM_BOXES, num_classes=cfg.NUM_CLASSES
-    ).to(cfg.DEVICE)
+    if not cfg.PRE_TRAINED_CNN:
+        model = YOLOv1(
+            split_size=cfg.SPLIT_SIZE,
+            num_boxes=cfg.NUM_BOXES,
+            num_classes=cfg.NUM_CLASSES,
+        ).to(cfg.DEVICE)
+    else:
+        model = YOLOv1PreTrained(
+            split_size=cfg.SPLIT_SIZE,
+            num_boxes=cfg.NUM_BOXES,
+            num_classes=cfg.NUM_CLASSES,
+        ).to(cfg.DEVICE)
     model.load_state_dict(
         torch.load(os.path.join(cfg.MODELS_DIR, cfg.LOAD_MODEL_FILENAME))
     )

@@ -14,6 +14,7 @@ import torchinfo
 
 import sys
 import os
+import importlib
 import importlib.util
 
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
@@ -25,16 +26,17 @@ from yolov1_pascalvoc.utils.visualization import *
 from yolov1_pascalvoc.loss.yolo_v1_loss import *
 from yolov1_pascalvoc.utils.common import *
 from yolov1_pascalvoc.utils.training_utils import *
-import yolov1_pascalvoc.config.yolov1_train_config as cfg
+
+import yolov1_pascalvoc.config.config_master as config_master
+cfg = importlib.import_module(config_master.CONFIG_FILE)
 
 # Seed for reproducibility
 seed_everything(cfg.SEED)
 
-
 def main():
     # Config dict creation
     spec = importlib.util.spec_from_file_location(
-        "config", "../config/yolov1_train_config.py"
+        "config", os.path.abspath(cfg.__file__)
     )
     config_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(config_module)
@@ -130,7 +132,7 @@ def main():
         print("-" * 20)
         print(f"Training phase - Epoch {epoch + 1}/{cfg.EPOCHS}")
         print("-" * 20)
-        train_loss = train_epoch(train_dataloader, model, optimizer, loss_fn)
+        train_loss = train_epoch(train_dataloader, model, optimizer, loss_fn, device=cfg.DEVICE)
         train_pred_boxes, train_target_boxes = get_bboxes(
             train_dataloader,
             model,
@@ -149,7 +151,7 @@ def main():
         print("-" * 20)
         print(f"Validation phase - Epoch {epoch + 1}/{cfg.EPOCHS}")
         print("-" * 20)
-        val_loss = validate_epoch(val_dataloader, model, loss_fn)
+        val_loss = validate_epoch(val_dataloader, model, loss_fn, device=cfg.DEVICE)
         val_pred_boxes, val_target_boxes = get_bboxes(
             val_dataloader,
             model,

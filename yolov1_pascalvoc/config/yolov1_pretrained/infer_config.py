@@ -16,10 +16,7 @@ SPLIT_SIZE = 7
 NUM_BOXES = 2
 NUM_CLASSES = 20
 PRE_TRAINED_CNN = True
-if PRE_TRAINED_CNN:
-    INPUT_SIZE = (224, 224)
-else:
-    INPUT_SIZE = (448, 448)
+INPUT_SIZE = (224, 224)
 TRANSFORM = Compose([transforms.Resize(INPUT_SIZE), transforms.ToTensor()])
 PRINT_NN_SUMMARY = False
 LOAD_MODEL = False

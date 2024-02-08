@@ -6,20 +6,19 @@ import os
 import wandb
 
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
-import yolov1_pascalvoc.config.yolov1_train_config as cfg
 from yolov1_pascalvoc.utils.metrics import *
 
 
 # Train function
-def train_epoch(train_dataloader, model, optimizer, loss_fn):
+def train_epoch(train_dataloader, model, optimizer, loss_fn, device="cuda"):
     train_dataloader_loop = tqdm(train_dataloader)
     model.train()  # set model to training mode
     losses = []
 
     # Iterate over the training data
     for batch_idx, (inputs_x, labels_y, _) in enumerate(train_dataloader_loop):
-        inputs_x, labels_y = inputs_x.to(cfg.DEVICE), labels_y.to(
-            cfg.DEVICE
+        inputs_x, labels_y = inputs_x.to(device), labels_y.to(
+            device
         )  # Move data to device (GPU if available)
 
         # forward pass: Feed inputs to the model and compute loss.
@@ -41,7 +40,7 @@ def train_epoch(train_dataloader, model, optimizer, loss_fn):
     return mean_loss
 
 
-def validate_epoch(val_dataloader, model, loss_fn):
+def validate_epoch(val_dataloader, model, loss_fn ,device="cuda"):
     val_dataloader_loop = tqdm(val_dataloader)
     model.eval()  # set model to evaluation mode
     losses = []
@@ -51,8 +50,8 @@ def validate_epoch(val_dataloader, model, loss_fn):
         for batch_idx, (inputs_x, labels_y, _) in enumerate(val_dataloader_loop):
             # forward pass: Feed inputs to the model and compute loss.
             # No need to compute gradients in validation phase (backpropagation)
-            inputs_x, labels_y = inputs_x.to(cfg.DEVICE), labels_y.to(
-                cfg.DEVICE
+            inputs_x, labels_y = inputs_x.to(device), labels_y.to(
+                device
             )  # Move data to device (GPU if available)
             outputs = model(inputs_x)  # Feed inputs to the model to get predictions
             loss = loss_fn(outputs, labels_y)  # calculate loss
