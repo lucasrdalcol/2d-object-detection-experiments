@@ -18,16 +18,16 @@ import importlib
 import importlib.util
 
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
-from yolov1_pascalvoc.models.yolo_v1 import *
-from yolov1_pascalvoc.models.yolo_v1_pre_trained import *
-from yolov1_pascalvoc.data_processing.pascalvoc_yolo import *
-from yolov1_pascalvoc.utils.metrics import *
-from yolov1_pascalvoc.utils.visualization import *
-from yolov1_pascalvoc.loss.yolo_v1_loss import *
-from yolov1_pascalvoc.utils.common import *
-from yolov1_pascalvoc.utils.training_utils import *
+from yolov1_nuimages.models.yolo_v1 import *
+from yolov1_nuimages.models.yolo_v1_pre_trained import *
+from yolov1_nuimages.data_processing.nuimages_yolo import *
+from yolov1_nuimages.utils.metrics import *
+from yolov1_nuimages.utils.visualization import *
+from yolov1_nuimages.loss.yolo_v1_loss import *
+from yolov1_nuimages.utils.common import *
+from yolov1_nuimages.utils.training_utils import *
 
-import yolov1_pascalvoc.config.config_master as config_master
+import yolov1_nuimages.config.config_master as config_master
 cfg = importlib.import_module(config_master.CONFIG_FILE)
 
 # Seed for reproducibility
@@ -72,7 +72,7 @@ def main():
     # start a new wandb run to track this script
     wandb.init(
         # set the wandb project where this run will be logged
-        project="YOLOv1",
+        project="YOLOv1_NuImages",
         # name="overfit_test",
         # track hyperparameters and run metadata
         config=config_dict,
@@ -88,31 +88,36 @@ def main():
         )
 
     # Load the training and validation datasets
-    train_dataset = PascalVOCDatasetYOLO(
-        os.path.join(cfg.DATASET_DIR, "100examples.csv"),
-        img_dir=os.path.join(cfg.DATASET_DIR, "images"),
-        label_dir=os.path.join(cfg.DATASET_DIR, "labels"),
-        transform=cfg.TRANSFORM,
-        decimation_factor=cfg.DECIMATION_FACTOR,
+    nuimages_train = NuImages(dataroot=f"{cfg.DATASET_DIR}/nuimages-v1.0-mini", version="v1.0-mini", verbose=True, lazy=False)
+    nuimages_val = NuImages(dataroot=f"{cfg.DATASET_DIR}/nuimages-v1.0-mini", version="v1.0-mini", verbose=True, lazy=False)
+
+    train_dataset = NuImagesDatasetYOLO(
+        nuimages_train,
+        transform=cfg.TRANSFORM, 
+        remove_empty=True, 
+        split_size=cfg.SPLIT_SIZE, 
+        num_boxes=cfg.NUM_BOXES, 
+        num_classes=cfg.NUM_CLASSES,
     )
 
-    val_dataset = PascalVOCDatasetYOLO(
-        os.path.join(cfg.DATASET_DIR, "100examples.csv"),
-        img_dir=os.path.join(cfg.DATASET_DIR, "images"),
-        label_dir=os.path.join(cfg.DATASET_DIR, "labels"),
-        transform=cfg.TRANSFORM,
-        decimation_factor=cfg.DECIMATION_FACTOR,
+    val_dataset = NuImagesDatasetYOLO(
+        nuimages_val,
+        transform=cfg.TRANSFORM, 
+        remove_empty=True, 
+        split_size=cfg.SPLIT_SIZE, 
+        num_boxes=cfg.NUM_BOXES, 
+        num_classes=cfg.NUM_CLASSES,
     )
 
     # Create training and validation dataloaders
-    train_dataloader = DataLoader(20
+    train_dataloader = DataLoader(
+        dataset=train_dataset,
+        batch_size=cfg.BATCH_SIZE,
+        num_workers=cfg.NUM_WORKERS,
+        pin_memory=cfg.PIN_MEMORY,
+        shuffle=True,
         drop_last=False,
     )
-
-    # # Get a batch of training data to check the dataloader
-    # images, label_matrices, filenames = next(iter(train_dataloader))
-    # print(f"images.shape: {images.shape}, label_matrices.shape: {label_matrices.shape}")
-    # print(label_matrices[0])
 
     val_dataloader = DataLoader(
         dataset=val_dataset,
@@ -240,28 +245,9 @@ def main():
 
     # Log the images and model predictions to wandb
     # this is the order in which my classes will be displayed
-    class_id_to_label = {
-        0: "aeroplane",
-        1: "bicycle",
-        2: "bird",
-        3: "boat",
-        4: "bottle",
-        5: "bus",
-        6: "car",
-        7: "cat",
-        8: "chair",
-        9: "cow",
-        10: "diningtable",
-        11: "dog",
-        12: "horse",
-        13: "motorbike",
-        14: "person",
-        15: "pottedplant",
-        16: "sheep",
-        17: "sofa",
-        18: "train",
-        19: "tvmonitor",
-    }
+    category_id_to_name = {}
+    for idx, category in enumerate(nuimages_train.category):
+        category_id_to_name[idx] = category["name"]
 
     for inputs_x, labels_y, filenames in val_dataloader:
         inputs_x = inputs_x.to(cfg.DEVICE)
@@ -283,13 +269,13 @@ def main():
                 inputs_x[idx].permute(1, 2, 0).to("cpu").numpy(),
                 filename_idx,
                 pred_bboxes_idx,
-                class_id_to_label,
+                category_id_to_name,
             )
             wandb_truebbox_image = wandb_bounding_boxes(
                 inputs_x[idx].permute(1, 2, 0).to("cpu").numpy(),
                 filename_idx,
                 true_bboxes_idx,
-                class_id_to_label,
+                category_id_to_name,
             )
 
             wandb.log(

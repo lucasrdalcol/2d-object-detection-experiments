@@ -1,12 +1,16 @@
+import os
 from pathlib import Path
+import sys
 import numpy as np
 import torch
 from PIL import Image
 from nuimages import NuImages
 from nuimages.utils.utils import mask_decode
+sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
+from yolov1_nuimages.utils.common import *
 
 
-class NuImagesDataset(torch.utils.data.Dataset):
+class NuImagesDatasetYOLO(torch.utils.data.Dataset):
     """
     Class for a NuImages dataset adapted for YOLOv1.
 
@@ -21,7 +25,7 @@ class NuImagesDataset(torch.utils.data.Dataset):
 
     """
 
-    def __init__(self, nuimages: NuImages, transforms=None, remove_empty=True, split_size=7, num_boxes=2, num_classes=25):
+    def __init__(self, nuimages: NuImages, transform=None, remove_empty=True, split_size=7, num_boxes=2, num_classes=25):
         # Check if the nuimages object contains the test set (no annotations)
         if len(nuimages.object_ann) == 0:
             self.has_ann = False
@@ -32,7 +36,7 @@ class NuImagesDataset(torch.utils.data.Dataset):
         assert type(nuimages) == NuImages
         self.nuimages = nuimages
         self.root_path = Path(nuimages.dataroot)
-        self.transforms = transforms
+        self.transform = transform
         self.S = split_size
         self.B = num_boxes
         self.C = num_classes
@@ -62,10 +66,9 @@ class NuImagesDataset(torch.utils.data.Dataset):
         # Create lookup table to convert category name to an int index
         # Speeds up creating annotations
         self._category_name_to_id = {}
-        self.category_names = ["background"]
+        self.category_names = []
         for idx, category in enumerate(nuimages.category):
-            # Start category IDs at 1. For torchvision compatibility, ID 0 *must* be background
-            self._category_name_to_id[category["name"]] = idx + 1
+            self._category_name_to_id[category["name"]] = idx
             self.category_names.append(category["name"])
 
         # Create lookup table that maps sample data to object annotations
@@ -110,6 +113,7 @@ class NuImagesDataset(torch.utils.data.Dataset):
         # Get the associated sample data, representing the image associated with the sample
         sd_token = sample["key_camera_token"]
         sample_data = self.nuimages.get("sample_data", sd_token)
+        filename = sample_data["filename"]
 
         # Read the image file
         image = Image.open(self.root_path / sample_data["filename"]).convert("RGB")
@@ -121,44 +125,42 @@ class NuImagesDataset(torch.utils.data.Dataset):
         # Get the object annotations corresponding to this sample data only
         object_anns = self.object_anns_dict[sd_token]
 
-        # NOTE: Surface annotations in nuscenes lack bounding boxes and instance IDs. Skip for now.
-        # if self.learn_surfaces:
-        #     surface_anns = [o for o in self.nuimages.surface_ann if o['sample_data_token'] == sd_token]
-        #     object_anns += surface_anns
-
         # Get bounding boxes
-        # Note object_ann['bbox'] gives the bounding box as [xmin, ymin, xmax, ymax]
-        boxes = torch.as_tensor([o["bbox"] for o in object_anns], dtype=torch.float32)
+        # Note object_ann['bbox'] gives the bounding box as [x0, y0, x1, y1]
+        # Convert to [x, y, w, h] for YOLOv1 as percentages of the image size
+        raw_boxes_nuimages = torch.as_tensor([object_ann["bbox"] for object_ann in object_anns], dtype=torch.float32)
+
+        boxes = torch.as_tensor([transform_box_nuimages2yolov1(box, sample_data["width"], sample_data["height"]) for box in raw_boxes_nuimages])
 
         # Get class labels for each bounding box
-        category_tokens = [o["category_token"] for o in object_anns]
-        categories = [self.nuimages.get("category", token) for token in category_tokens]
-        labels = torch.as_tensor(
-            [self._category_name_to_id[cat["name"]] for cat in categories],
+        category_tokens = [object_ann["category_token"] for object_ann in object_anns]
+        categories = [self.nuimages.get("category", category_token) for category_token in category_tokens]
+        class_labels = torch.as_tensor(
+            [self._category_name_to_id[categorie["name"]] for categorie in categories],
             dtype=torch.int64,
         )
 
-        # Use key camera token as image identifier
-        # Convert key camera token from hexadecimal to an integer, and use it as the unique identifier
-        image_id = torch.as_tensor([idx]).type(torch.int64)
+        if self.transform:
+            image, boxes = self.transform(image, boxes)
 
-        # Compute area
-        if boxes.shape[0] == 0:
-            area = torch.as_tensor([])
-        else:
-            area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
+        # Convert box coordinates (for entire image) to cell coordinates (for YOLOv1 grid division).
+        label_matrix = torch.zeros((self.S, self.S, self.C + self.B * 5))
+        for class_label, box in zip(class_labels, boxes):
+            x, y, width, height = box.tolist()
+            class_label = int(class_label)
+            # i,j represents the cell row and cell column in the image grid.
+            i, j = int(self.S * y), int(self.S * x)
+            x_cell, y_cell = self.S * x - j, self.S * y - i
+            width_cell, height_cell = width * self.S, height * self.S
 
-        # Assume all instances are not crowd
-        iscrowd = torch.zeros((len(object_anns),), dtype=torch.int64)
+            # If no object already found for specific cell i,j, use the box and assign the box relative to the cell.
+            # Note: This means we restrict to ONE object per cell!
+            if label_matrix[i, j, self.C] == 0:
+                # Set that there exists an object
+                label_matrix[i, j, self.C] = 1
+                box_coordinates = torch.tensor([x_cell, y_cell, width_cell, height_cell])
+                label_matrix[i, j, self.C+1:self.C+5] = box_coordinates
+                # Set one hot encoding for class_label
+                label_matrix[i, j, class_label] = 1
 
-        target = {}
-        target["boxes"] = boxes
-        target["labels"] = labels
-        target["image_id"] = image_id
-        target["area"] = area
-        target["iscrowd"] = iscrowd
-
-        if self.transforms is not None:
-            image, target = self.transforms(image, target)
-
-        return image, target
+        return image, label_matrix, filename
