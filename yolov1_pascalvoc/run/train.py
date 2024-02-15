@@ -105,7 +105,12 @@ def main():
     )
 
     # Create training and validation dataloaders
-    train_dataloader = DataLoader(20
+    train_dataloader = DataLoader(
+        dataset=train_dataset,
+        batch_size=cfg.BATCH_SIZE,
+        num_workers=cfg.NUM_WORKERS,
+        pin_memory=cfg.PIN_MEMORY,
+        shuffle=True,
         drop_last=False,
     )
 
