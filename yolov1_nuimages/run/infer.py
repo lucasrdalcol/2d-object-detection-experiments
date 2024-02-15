@@ -17,15 +17,15 @@ import importlib
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 from yolov1_nuimages.models.yolo_v1 import *
 from yolov1_nuimages.models.yolo_v1_pre_trained import *
-from yolov1_nuimages.data_processing.pascalvoc_yolo import *
+from yolov1_nuimages.data_processing.nuimages_yolo import *
 from yolov1_nuimages.utils.metrics import *
 from yolov1_nuimages.utils.visualization import *
 from yolov1_nuimages.loss.yolo_v1_loss import *
 from yolov1_nuimages.utils.common import *
 from yolov1_nuimages.utils.training_utils import *
 
-import yolov1_nuimages.config.config_master as config_master
-cfg = importlib.import_module(config_master.CONFIG_FILE)
+import yolov1_nuimages.config.infer_config_master as infer_config_master
+cfg = importlib.import_module(infer_config_master.CONFIG_FILE)
 
 # Seed for reproducibility
 seed_everything(cfg.SEED)
@@ -55,12 +55,14 @@ def main():
         torchinfo.summary(model, input_size=(cfg.BATCH_SIZE, 3, cfg.INPUT_SIZE[0], cfg.INPUT_SIZE[1]), col_names=("input_size", "output_size", "num_params", "kernel_size", "mult_adds"), verbose=1)
 
     # Load the training and validation datasets
-    test_dataset = PascalVOCDatasetYOLO(
-        os.path.join(cfg.DATASET_DIR, "test.csv"),
-        img_dir=os.path.join(cfg.DATASET_DIR, "images"),
-        label_dir=os.path.join(cfg.DATASET_DIR, "labels"),
-        transform=cfg.TRANSFORM,
-        decimation_factor=cfg.DECIMATION_FACTOR,
+    nuimages_test = NuImages(dataroot=f"{cfg.DATASET_DIR}/nuimages-v1.0-mini", version="v1.0-mini", verbose=True, lazy=False)
+    test_dataset = NuImagesDatasetYOLO(
+        nuimages_test,
+        transform=cfg.TRANSFORM, 
+        remove_empty=True, 
+        split_size=cfg.SPLIT_SIZE, 
+        num_boxes=cfg.NUM_BOXES, 
+        num_classes=cfg.NUM_CLASSES,
     )
 
     # Create training and validation dataloaders

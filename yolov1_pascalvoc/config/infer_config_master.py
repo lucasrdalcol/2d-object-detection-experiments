@@ -1,0 +1,1 @@
+CONFIG_FILE = "yolov1_pascalvoc.config.yolov1_pretrained.infer_config"

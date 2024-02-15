@@ -27,8 +27,8 @@ from yolov1_pascalvoc.loss.yolo_v1_loss import *
 from yolov1_pascalvoc.utils.common import *
 from yolov1_pascalvoc.utils.training_utils import *
 
-import yolov1_pascalvoc.config.config_master as config_master
-cfg = importlib.import_module(config_master.CONFIG_FILE)
+import yolov1_pascalvoc.config.train_config_master as train_config_master
+cfg = importlib.import_module(train_config_master.CONFIG_FILE)
 
 # Seed for reproducibility
 seed_everything(cfg.SEED)
@@ -73,7 +73,7 @@ def main():
     wandb.init(
         # set the wandb project where this run will be logged
         project="YOLOv1",
-        # name="overfit_test",
+        name="overfit_test2",
         # track hyperparameters and run metadata
         config=config_dict,
         # mode="disabled",

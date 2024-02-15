@@ -5,3 +5,4 @@ Pillow
 tqdm
 wandb
 torchinfo
+nuscenes-devkit
