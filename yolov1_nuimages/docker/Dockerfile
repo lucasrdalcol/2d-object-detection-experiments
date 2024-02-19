@@ -1,12 +1,13 @@
-FROM pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime
+FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
 
+ENV DEBIAN_FRONTEND=noninteractive
 ENV PROJECT_NAME="2d-object-detection-experiments"
 
 COPY requirements.txt /tmp/
 RUN pip install --requirement /tmp/requirements.txt
 
 RUN apt-get update
-RUN apt-get install ffmpeg libsm6 libxext6 vim git -y
+RUN apt-get install ffmpeg libsm6 libxext6 vim -y
 
 WORKDIR /root
 
@@ -26,5 +27,7 @@ ENV PHD_RESULTS="/root/results"
 
 ENV PYTHONPATH="/root/repositories/${PROJECT_NAME}"
 ENV TWODOBJECTDETECTION_ROOT="/root/repositories/${PROJECT_NAME}"
+
+ENV WANDB_DIR="/root/results/${PROJECT_NAME}"
 
 ENV USER="lucasrdalcol"

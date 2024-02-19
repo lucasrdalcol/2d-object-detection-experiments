@@ -11,6 +11,7 @@ import time
 import wandb
 import random
 import torchinfo
+import matplotlib.pyplot as plt
 
 import sys
 import os
@@ -64,6 +65,8 @@ def main():
     )
     loss_fn = YOLOv1Loss()
 
+    print(f"The model is in device: {next(model.parameters()).device}")  # Check if the model is in the GPU
+
     # Print summary of the model
     if cfg.PRINT_NN_SUMMARY:
         print(model)
@@ -73,7 +76,7 @@ def main():
     wandb.init(
         # set the wandb project where this run will be logged
         project="YOLOv1_NuImages",
-        name="pretrained_overfit_test",
+        name="pretrained_test2_resnet18",
         # track hyperparameters and run metadata
         config=config_dict,
         # mode="disabled",
@@ -88,8 +91,8 @@ def main():
         )
 
     # Load the training and validation datasets
-    nuimages_train = NuImages(dataroot=f"{cfg.DATASET_DIR}/nuimages-v1.0-mini", version="v1.0-mini", verbose=True, lazy=False)
-    nuimages_val = NuImages(dataroot=f"{cfg.DATASET_DIR}/nuimages-v1.0-mini", version="v1.0-mini", verbose=True, lazy=False)
+    nuimages_train = NuImages(dataroot=cfg.DATASET_DIR, version="v1.0-train", verbose=True, lazy=False)
+    nuimages_val = NuImages(dataroot=cfg.DATASET_DIR, version="v1.0-val", verbose=True, lazy=False)
 
     train_dataset = NuImagesDatasetYOLO(
         nuimages_train,
@@ -128,7 +131,26 @@ def main():
         drop_last=False,
     )
 
+    # Visualize the transformed images for a batch
+    if cfg.SHOW_BATCH_IMAGES:
+        input_images, label_matrices, filenames = next(iter(val_dataloader))
+        for i in range(len(input_images)):
+            # Get the i-th image
+            image = input_images[i].cpu().numpy().transpose(1, 2, 0)  # Change from (channels, height, width) to (height, width, channels)
+            print(image)
+            # Create a new figure
+            plt.figure()
+            # Plot the image
+            plt.imshow(image)
+            plt.axis("on")  # Turn on the axes
+            # Add a title
+            plt.title(filenames[i])
+            # Show the plot
+            plt.show()
+
     # Train the model
+    _ = next(iter(train_dataloader)) # Load the first batch to check if everything is working
+    _ = next(iter(val_dataloader)) 
     since = time.time()
     for epoch in range(cfg.EPOCHS):
         print("=" * 50)
@@ -144,6 +166,7 @@ def main():
             model,
             iou_threshold=0.5,
             threshold=0.4,
+            device=cfg.DEVICE,
         )  # Get the predictions and targets bboxes to compute mAP for the training dataset
         train_mean_avg_prec = mean_average_precision(
             train_pred_boxes,
@@ -163,6 +186,7 @@ def main():
             model,
             iou_threshold=0.5,
             threshold=0.4,
+            device=cfg.DEVICE,
         )
         val_mean_avg_prec = mean_average_precision(
             val_pred_boxes,
@@ -227,21 +251,21 @@ def main():
                 )
                 true_bboxes_idx = true_bboxes[idx]
                 filename_idx = filenames[idx]
-                plt = plot_comparison_image(
+                plt_image = plot_comparison_image(
                     inputs_x[idx].permute(1, 2, 0).to("cpu"),
                     filename_idx,
                     pred_bboxes_idx,
                     true_bboxes_idx,
                 )
                 if cfg.SAVE_RESULTS:
-                    plt.savefig(
+                    plt_image.savefig(
                         os.path.join(
                             results_folder_path,
                             f"{filename_idx.split('.')[0]}.png",
                         )
                     )
                 if cfg.VISUALIZE_RESULTS:
-                    plt.show()
+                    plt_image.show()
 
     # Log the images and model predictions to wandb
     # this is the order in which my classes will be displayed
