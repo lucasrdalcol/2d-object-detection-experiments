@@ -29,10 +29,12 @@ from yolov1_nuimages.utils.common import *
 from yolov1_nuimages.utils.training_utils import *
 
 import yolov1_nuimages.config.train_config_master as train_config_master
+
 cfg = importlib.import_module(train_config_master.CONFIG_FILE)
 
 # Seed for reproducibility
 seed_everything(cfg.SEED)
+
 
 def main():
     # Config dict creation
@@ -65,18 +67,31 @@ def main():
     )
     loss_fn = YOLOv1Loss()
 
-    print(f"The model is in device: {next(model.parameters()).device}")  # Check if the model is in the GPU
+    print(
+        f"The model is in device: {next(model.parameters()).device}"
+    )  # Check if the model is in the GPU
 
     # Print summary of the model
     if cfg.PRINT_NN_SUMMARY:
         print(model)
-        torchinfo.summary(model, input_size=(cfg.BATCH_SIZE, 3, cfg.INPUT_SIZE[0], cfg.INPUT_SIZE[1]), col_names=("input_size", "output_size", "num_params", "kernel_size", "mult_adds"), verbose=1)
+        torchinfo.summary(
+            model,
+            input_size=(cfg.BATCH_SIZE, 3, cfg.INPUT_SIZE[0], cfg.INPUT_SIZE[1]),
+            col_names=(
+                "input_size",
+                "output_size",
+                "num_params",
+                "kernel_size",
+                "mult_adds",
+            ),
+            verbose=1,
+        )
 
     # start a new wandb run to track this script
     wandb.init(
         # set the wandb project where this run will be logged
         project="YOLOv1_NuImages",
-        name="pretrained_test2_resnet18",
+        name="pretrained_test3_resnet18",
         # track hyperparameters and run metadata
         config=config_dict,
         # mode="disabled",
@@ -91,24 +106,28 @@ def main():
         )
 
     # Load the training and validation datasets
-    nuimages_train = NuImages(dataroot=cfg.DATASET_DIR, version="v1.0-train", verbose=True, lazy=False)
-    nuimages_val = NuImages(dataroot=cfg.DATASET_DIR, version="v1.0-val", verbose=True, lazy=False)
+    nuimages_train = NuImages(
+        dataroot=cfg.DATASET_DIR, version="v1.0-train", verbose=True, lazy=False
+    )
+    nuimages_val = NuImages(
+        dataroot=cfg.DATASET_DIR, version="v1.0-val", verbose=True, lazy=False
+    )
 
     train_dataset = NuImagesDatasetYOLO(
         nuimages_train,
-        transform=cfg.TRANSFORM, 
-        remove_empty=True, 
-        split_size=cfg.SPLIT_SIZE, 
-        num_boxes=cfg.NUM_BOXES, 
+        transform=cfg.TRANSFORM,
+        remove_empty=True,
+        split_size=cfg.SPLIT_SIZE,
+        num_boxes=cfg.NUM_BOXES,
         num_classes=cfg.NUM_CLASSES,
     )
 
     val_dataset = NuImagesDatasetYOLO(
         nuimages_val,
-        transform=cfg.TRANSFORM, 
-        remove_empty=True, 
-        split_size=cfg.SPLIT_SIZE, 
-        num_boxes=cfg.NUM_BOXES, 
+        transform=cfg.TRANSFORM,
+        remove_empty=True,
+        split_size=cfg.SPLIT_SIZE,
+        num_boxes=cfg.NUM_BOXES,
         num_classes=cfg.NUM_CLASSES,
     )
 
@@ -136,7 +155,9 @@ def main():
         input_images, label_matrices, filenames = next(iter(val_dataloader))
         for i in range(len(input_images)):
             # Get the i-th image
-            image = input_images[i].cpu().numpy().transpose(1, 2, 0)  # Change from (channels, height, width) to (height, width, channels)
+            image = (
+                input_images[i].cpu().numpy().transpose(1, 2, 0)
+            )  # Change from (channels, height, width) to (height, width, channels)
             print(image)
             # Create a new figure
             plt.figure()
@@ -149,8 +170,10 @@ def main():
             plt.show()
 
     # Train the model
-    _ = next(iter(train_dataloader)) # Load the first batch to check if everything is working
-    _ = next(iter(val_dataloader)) 
+    _ = next(
+        iter(train_dataloader)
+    )  # Load the first batch to check if everything is working
+    _ = next(iter(val_dataloader))
     since = time.time()
     for epoch in range(cfg.EPOCHS):
         print("=" * 50)
@@ -160,46 +183,29 @@ def main():
         print("-" * 20)
         print(f"Training phase - Epoch {epoch + 1}/{cfg.EPOCHS}")
         print("-" * 20)
-        train_loss = train_epoch(train_dataloader, model, optimizer, loss_fn, device=cfg.DEVICE)
-        train_pred_boxes, train_target_boxes = get_bboxes(
-            train_dataloader,
-            model,
-            iou_threshold=0.5,
-            threshold=0.4,
-            device=cfg.DEVICE,
-        )  # Get the predictions and targets bboxes to compute mAP for the training dataset
-        train_mean_avg_prec = mean_average_precision(
-            train_pred_boxes,
-            train_target_boxes,
-            iou_threshold=0.5,
-            box_format="midpoint",
-        )  # Compute mAP for the training data
-        print(f"Train mAP: {train_mean_avg_prec}")
+        train_loss = train_epoch(
+            train_dataloader, model, optimizer, loss_fn, device=cfg.DEVICE
+        )
 
         # Validation phase
         print("-" * 20)
         print(f"Validation phase - Epoch {epoch + 1}/{cfg.EPOCHS}")
         print("-" * 20)
-        val_loss = validate_epoch(val_dataloader, model, loss_fn, device=cfg.DEVICE)
-        val_pred_boxes, val_target_boxes = get_bboxes(
+        val_loss, val_mean_avg_prec = validate_epoch(
             val_dataloader,
             model,
+            loss_fn,
             iou_threshold=0.5,
-            threshold=0.4,
+            prob_threshold=0.4,
             device=cfg.DEVICE,
-        )
-        val_mean_avg_prec = mean_average_precision(
-            val_pred_boxes,
-            val_target_boxes,
-            iou_threshold=0.5,
-            box_format="midpoint",
         )
         print(f"Val mAP: {val_mean_avg_prec}")
 
         # Log metrics to wandb
         wandb.log(
             {
-                "train": {"mAP": train_mean_avg_prec, "loss": train_loss},
+                "epoch": epoch + 1,
+                "train": {"loss": train_loss},
                 "val": {"mAP": val_mean_avg_prec, "loss": val_loss},
             }
         )
@@ -208,12 +214,11 @@ def main():
 
     # Print the time it took to train the model
     time_elapsed = time.time() - since
+    hours = int(time_elapsed // 3600)
+    minutes = int((time_elapsed % 3600) // 60)
+    seconds = int(time_elapsed % 60)
     print("Training finished!")
-    print(
-        "Training completed in {:.0f}m {:.0f}s".format(
-            time_elapsed // 60, time_elapsed % 60
-        )
-    )
+    print("Training completed in {}h {}m {}s".format(hours, minutes, seconds))
 
     # Save best trained model
     if cfg.SAVE_MODEL:

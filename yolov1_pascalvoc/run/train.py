@@ -16,6 +16,7 @@ import sys
 import os
 import importlib
 import importlib.util
+from datetime import datetime
 
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 from yolov1_pascalvoc.models.yolo_v1 import *
@@ -28,10 +29,12 @@ from yolov1_pascalvoc.utils.common import *
 from yolov1_pascalvoc.utils.training_utils import *
 
 import yolov1_pascalvoc.config.train_config_master as train_config_master
+
 cfg = importlib.import_module(train_config_master.CONFIG_FILE)
 
 # Seed for reproducibility
 seed_everything(cfg.SEED)
+
 
 def main():
     # Config dict creation
@@ -64,10 +67,25 @@ def main():
     )
     loss_fn = YOLOv1Loss()
 
+    print(
+        f"The model is in device: {next(model.parameters()).device}"
+    )  # Check if the model is in the GPU
+
     # Print summary of the model
     if cfg.PRINT_NN_SUMMARY:
         print(model)
-        torchinfo.summary(model, input_size=(cfg.BATCH_SIZE, 3, cfg.INPUT_SIZE[0], cfg.INPUT_SIZE[1]), col_names=("input_size", "output_size", "num_params", "kernel_size", "mult_adds"), verbose=1)
+        torchinfo.summary(
+            model,
+            input_size=(cfg.BATCH_SIZE, 3, cfg.INPUT_SIZE[0], cfg.INPUT_SIZE[1]),
+            col_names=(
+                "input_size",
+                "output_size",
+                "num_params",
+                "kernel_size",
+                "mult_adds",
+            ),
+            verbose=1,
+        )
 
     # start a new wandb run to track this script
     wandb.init(
@@ -89,7 +107,7 @@ def main():
 
     # Load the training and validation datasets
     train_dataset = PascalVOCDatasetYOLO(
-        os.path.join(cfg.DATASET_DIR, "100examples.csv"),
+        os.path.join(cfg.DATASET_DIR, "train.csv"),
         img_dir=os.path.join(cfg.DATASET_DIR, "images"),
         label_dir=os.path.join(cfg.DATASET_DIR, "labels"),
         transform=cfg.TRANSFORM,
@@ -97,7 +115,7 @@ def main():
     )
 
     val_dataset = PascalVOCDatasetYOLO(
-        os.path.join(cfg.DATASET_DIR, "100examples.csv"),
+        os.path.join(cfg.DATASET_DIR, "test.csv"),
         img_dir=os.path.join(cfg.DATASET_DIR, "images"),
         label_dir=os.path.join(cfg.DATASET_DIR, "labels"),
         transform=cfg.TRANSFORM,
@@ -114,11 +132,6 @@ def main():
         drop_last=False,
     )
 
-    # # Get a batch of training data to check the dataloader
-    # images, label_matrices, filenames = next(iter(train_dataloader))
-    # print(f"images.shape: {images.shape}, label_matrices.shape: {label_matrices.shape}")
-    # print(label_matrices[0])
-
     val_dataloader = DataLoader(
         dataset=val_dataset,
         batch_size=cfg.BATCH_SIZE,
@@ -128,7 +141,30 @@ def main():
         drop_last=False,
     )
 
+    # Visualize the transformed images for a batch
+    if cfg.SHOW_BATCH_IMAGES:
+        input_images, label_matrices, filenames = next(iter(val_dataloader))
+        for i in range(len(input_images)):
+            # Get the i-th image
+            image = (
+                input_images[i].cpu().numpy().transpose(1, 2, 0)
+            )  # Change from (channels, height, width) to (height, width, channels)
+            print(image)
+            # Create a new figure
+            plt.figure()
+            # Plot the image
+            plt.imshow(image)
+            plt.axis("on")  # Turn on the axes
+            # Add a title
+            plt.title(filenames[i])
+            # Show the plot
+            plt.show()
+
     # Train the model
+    _ = next(
+        iter(train_dataloader)
+    )  # Load the first batch to check if everything is working
+    _ = next(iter(val_dataloader))
     since = time.time()
     for epoch in range(cfg.EPOCHS):
         print("=" * 50)
@@ -138,12 +174,15 @@ def main():
         print("-" * 20)
         print(f"Training phase - Epoch {epoch + 1}/{cfg.EPOCHS}")
         print("-" * 20)
-        train_loss = train_epoch(train_dataloader, model, optimizer, loss_fn, device=cfg.DEVICE)
+        train_loss = train_epoch(
+            train_dataloader, model, optimizer, loss_fn, device=cfg.DEVICE
+        )
         train_pred_boxes, train_target_boxes = get_bboxes(
             train_dataloader,
             model,
             iou_threshold=0.5,
             threshold=0.4,
+            device=cfg.DEVICE,
         )  # Get the predictions and targets bboxes to compute mAP for the training dataset
         train_mean_avg_prec = mean_average_precision(
             train_pred_boxes,
@@ -163,6 +202,7 @@ def main():
             model,
             iou_threshold=0.5,
             threshold=0.4,
+            device=cfg.DEVICE,
         )
         val_mean_avg_prec = mean_average_precision(
             val_pred_boxes,

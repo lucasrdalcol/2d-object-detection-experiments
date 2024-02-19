@@ -1,1 +1,1 @@
-CONFIG_FILE = "yolov1_pascalvoc.config.yolov1_original.train_config"
+CONFIG_FILE = "yolov1_pascalvoc.config.yolov1_pretrained.train_config"
