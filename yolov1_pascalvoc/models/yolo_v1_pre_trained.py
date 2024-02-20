@@ -32,12 +32,15 @@ class YOLOv1PreTrained(nn.Module):
         # Way of doing it with nn.Sequential:
         fcs = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(2048 * S * S, 496),  # In the original paper this should be 4096
-            nn.Dropout(0.0),  # In the original paper this should be 0.5
+            nn.Linear(
+                7 * 7 * 2048, 4096
+            ),  # In the original paper this should be 4096. The input size is 7x7x512 due to the last conv layer of the ResNet18
+            nn.Dropout(0.5),  # In the original paper this should be 0.5
             nn.LeakyReLU(0.1),
             nn.Linear(
-                496, S * S * (C + B * 5)
+                4096, S * S * (C + B * 5)
             ),  # reshape afterwards to shape (S, S, 30) where C + B * 5 = 30, for the loss function
         )
 
         return fcs
+

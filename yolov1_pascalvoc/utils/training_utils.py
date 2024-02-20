@@ -40,10 +40,36 @@ def train_epoch(train_dataloader, model, optimizer, loss_fn, device="cuda"):
     return mean_loss
 
 
-def validate_epoch(val_dataloader, model, loss_fn ,device="cuda"):
+def validate_epoch(
+    val_dataloader,
+    model,
+    loss_fn,
+    iou_threshold,
+    prob_threshold,
+    box_format="midpoint",
+    device="cuda",
+):
+    """
+    Perform validation for one epoch.
+
+    Args:
+        val_dataloader (torch.utils.data.DataLoader): The validation data loader.
+        model (torch.nn.Module): The model to be evaluated.
+        loss_fn (callable): The loss function used for calculating the loss.
+        iou_threshold (float): The IoU threshold for non-maximum suppression.
+        prob_threshold (float): The probability threshold for filtering predictions.
+        box_format (str, optional): The format of the bounding boxes. Defaults to "midpoint".
+        device (str, optional): The device to be used for computation. Defaults to "cuda".
+
+    Returns:
+        tuple: A tuple containing the mean loss and mean average precision.
+    """
     val_dataloader_loop = tqdm(val_dataloader)
     model.eval()  # set model to evaluation mode
     losses = []
+    all_pred_boxes = []
+    all_true_boxes = []
+    train_idx = 0
 
     # Iterate over the validation data
     with torch.no_grad():  # disable gradient calculation
@@ -53,17 +79,51 @@ def validate_epoch(val_dataloader, model, loss_fn ,device="cuda"):
             inputs_x, labels_y = inputs_x.to(device), labels_y.to(
                 device
             )  # Move data to device (GPU if available)
-            outputs = model(inputs_x)  # Feed inputs to the model to get predictions
-            loss = loss_fn(outputs, labels_y)  # calculate loss
+            predictions = model(inputs_x)  # Feed inputs to the model to get predictions
+            loss = loss_fn(predictions, labels_y)  # calculate loss
             losses.append(loss.item())
 
             val_dataloader_loop.set_postfix(loss=loss.item())  # update progress bar
+
+            batch_size = inputs_x.shape[0]
+            true_bboxes = cellboxes_to_boxes(labels_y)
+            pred_bboxes = cellboxes_to_boxes(predictions)
+
+            for idx in range(batch_size):
+                nms_boxes = non_max_suppression(
+                    pred_bboxes[idx],
+                    iou_threshold=iou_threshold,
+                    prob_threshold=prob_threshold,
+                    box_format=box_format,
+                )
+
+                # if batch_idx == 0 and idx == 0:
+                #    plot_image(x[idx].permute(1,2,0).to("cpu"), nms_boxes)
+                #    print(nms_boxes)
+
+                for nms_box in nms_boxes:
+                    all_pred_boxes.append([train_idx] + nms_box)
+
+                for true_box in true_bboxes[idx]:
+                    # many will get converted to 0 pred
+                    if true_box[1] > prob_threshold:
+                        all_true_boxes.append([train_idx] + true_box)
+
+                train_idx += 1
 
     # Compute mean loss over all batches of the validation data
     mean_loss = sum(losses) / len(losses)
     print(f"Val mean loss: {mean_loss}")
 
-    return mean_loss
+    # Compute mean average precision
+    mean_avg_prec = mean_average_precision(
+        all_pred_boxes,
+        all_true_boxes,
+        iou_threshold=iou_threshold,
+        box_format=box_format,
+    )
+
+    return mean_loss, mean_avg_prec
 
 
 def get_bboxes(

@@ -91,7 +91,7 @@ def main():
     wandb.init(
         # set the wandb project where this run will be logged
         project="YOLOv1",
-        name="overfit_test2",
+        name="pretrained_test2_resnet50",
         # track hyperparameters and run metadata
         config=config_dict,
         # mode="disabled",
@@ -177,45 +177,39 @@ def main():
         train_loss = train_epoch(
             train_dataloader, model, optimizer, loss_fn, device=cfg.DEVICE
         )
-        train_pred_boxes, train_target_boxes = get_bboxes(
-            train_dataloader,
-            model,
-            iou_threshold=0.5,
-            threshold=0.4,
-            device=cfg.DEVICE,
-        )  # Get the predictions and targets bboxes to compute mAP for the training dataset
-        train_mean_avg_prec = mean_average_precision(
-            train_pred_boxes,
-            train_target_boxes,
-            iou_threshold=0.5,
-            box_format="midpoint",
-        )  # Compute mAP for the training data
-        print(f"Train mAP: {train_mean_avg_prec}")
+        # train_pred_boxes, train_target_boxes = get_bboxes(
+        #     train_dataloader,
+        #     model,
+        #     iou_threshold=0.5,
+        #     threshold=0.4,
+        #     device=cfg.DEVICE,
+        # )  # Get the predictions and targets bboxes to compute mAP for the training dataset
+        # train_mean_avg_prec = mean_average_precision(
+        #     train_pred_boxes,
+        #     train_target_boxes,
+        #     iou_threshold=0.5,
+        #     box_format="midpoint",
+        # )  # Compute mAP for the training data
+        # print(f"Train mAP: {train_mean_avg_prec}")
 
         # Validation phase
         print("-" * 20)
         print(f"Validation phase - Epoch {epoch + 1}/{cfg.EPOCHS}")
         print("-" * 20)
-        val_loss = validate_epoch(val_dataloader, model, loss_fn, device=cfg.DEVICE)
-        val_pred_boxes, val_target_boxes = get_bboxes(
+        val_loss, val_mean_avg_prec = validate_epoch(
             val_dataloader,
             model,
+            loss_fn,
             iou_threshold=0.5,
-            threshold=0.4,
+            prob_threshold=0.4,
             device=cfg.DEVICE,
-        )
-        val_mean_avg_prec = mean_average_precision(
-            val_pred_boxes,
-            val_target_boxes,
-            iou_threshold=0.5,
-            box_format="midpoint",
         )
         print(f"Val mAP: {val_mean_avg_prec}")
 
         # Log metrics to wandb
         wandb.log(
             {
-                "train": {"mAP": train_mean_avg_prec, "loss": train_loss},
+                "train": {"loss": train_loss},
                 "val": {"mAP": val_mean_avg_prec, "loss": val_loss},
             }
         )
@@ -224,12 +218,11 @@ def main():
 
     # Print the time it took to train the model
     time_elapsed = time.time() - since
+    hours = int(time_elapsed // 3600)
+    minutes = int((time_elapsed % 3600) // 60)
+    seconds = int(time_elapsed % 60)
     print("Training finished!")
-    print(
-        "Training completed in {:.0f}m {:.0f}s".format(
-            time_elapsed // 60, time_elapsed % 60
-        )
-    )
+    print("Training completed in {}h {}m {}s".format(hours, minutes, seconds))
 
     # Save best trained model
     if cfg.SAVE_MODEL:
