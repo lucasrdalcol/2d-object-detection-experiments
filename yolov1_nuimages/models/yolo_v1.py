@@ -118,16 +118,16 @@ class YOLOv1(nn.Module):
 
     # This function creates the fully connected layers
     # The functions starting with _ are internal functions only used by the class.
-    def _create_fcs(self, split_size, num_boxes, num_classes):
+    def _create_fcs(self, split_size, num_boxes, num_classes, fcl_size, dropout):
         S, B, C = split_size, num_boxes, num_classes
         # Way of doing it with nn.Sequential:
         fcs = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(1024 * S * S, 496),  # In the original paper this should be 4096
-            nn.Dropout(0.0),  # In the original paper this should be 0.5
+            nn.Linear(1024 * S * S, fcl_size),  # In the original paper fcl_size should be 4096
+            nn.Dropout(dropout),  # In the original paper this should be 0.5
             nn.LeakyReLU(0.1),
             nn.Linear(
-                496, S * S * (C + B * 5)
+                fcl_size, S * S * (C + B * 5)
             ),  # reshape afterwards to shape (S, S, 30) where C + B * 5 = 35, for the loss function
         )
 

@@ -116,3 +116,22 @@ def transform_box_nuimages2yolov1(box, image_width, image_height):
     box = [x_middle, y_middle, width, height]
 
     return box
+
+class DotDict(dict):
+    """
+    Dot notation access to dictionary attributes, recursively.
+    """
+    def __getattr__(self, attr):
+        value = self.get(attr)
+        if isinstance(value, dict):
+            return DotDict(value)
+        return value
+
+    __setattr__ = dict.__setitem__
+
+    def __delattr__(self, attr):
+        del self[attr]
+
+    def __missing__(self, key):
+        self[key] = DotDict()
+        return self[key]

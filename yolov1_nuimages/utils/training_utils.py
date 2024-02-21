@@ -46,6 +46,10 @@ def train_epoch(train_dataloader, model, optimizer, loss_fn, device="cuda"):
 
         train_dataloader_loop.set_postfix(loss=loss.item())  # update progress bar
 
+        # Clear memory
+        del loss, predictions
+        torch.cuda.empty_cache()  # Clear GPU memory
+
     # Compute mean loss over all batches of the training data
     mean_loss = sum(losses) / len(losses)
     print(f"Train mean loss: {mean_loss}")
@@ -123,6 +127,10 @@ def validate_epoch(
                         all_true_boxes.append([train_idx] + true_box)
 
                 train_idx += 1
+
+            # Clear memory
+            del loss, predictions
+            torch.cuda.empty_cache()  # Clear GPU memory
 
     # Compute mean loss over all batches of the validation data
     mean_loss = sum(losses) / len(losses)

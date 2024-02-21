@@ -16,7 +16,7 @@ import importlib
 
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 from yolov1_nuimages.models.yolo_v1 import *
-from yolov1_nuimages.models.yolo_v1_pre_trained import *
+from yolov1_nuimages.models.yolo_v1_pretrained_resnet50 import *
 from yolov1_nuimages.data_processing.nuimages_yolo import *
 from yolov1_nuimages.utils.metrics import *
 from yolov1_nuimages.utils.visualization import *
@@ -40,7 +40,7 @@ def main():
             num_classes=cfg.NUM_CLASSES,
         ).to(cfg.DEVICE)
     else:
-        model = YOLOv1PreTrained(
+        model = YOLOv1PreTrainedResnet50(
             split_size=cfg.SPLIT_SIZE,
             num_boxes=cfg.NUM_BOXES,
             num_classes=cfg.NUM_CLASSES,

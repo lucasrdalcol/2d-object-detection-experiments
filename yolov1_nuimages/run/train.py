@@ -20,7 +20,7 @@ import importlib.util
 
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 from yolov1_nuimages.models.yolo_v1 import *
-from yolov1_nuimages.models.yolo_v1_pre_trained import *
+from yolov1_nuimages.models.yolo_v1_pretrained_resnet50 import *
 from yolov1_nuimages.data_processing.nuimages_yolo import *
 from yolov1_nuimages.utils.metrics import *
 from yolov1_nuimages.utils.visualization import *
@@ -30,24 +30,39 @@ from yolov1_nuimages.utils.training_utils import *
 
 import yolov1_nuimages.config.train_config_master as train_config_master
 
-cfg = importlib.import_module(train_config_master.CONFIG_FILE)
+config_file = importlib.import_module(train_config_master.CONFIG_FILE)
 
 # Seed for reproducibility
-seed_everything(cfg.SEED)
+seed_everything(config_file.SEED)
 
 
 def main():
     # Config dict creation
     spec = importlib.util.spec_from_file_location(
-        "config", os.path.abspath(cfg.__file__)
+        "config", os.path.abspath(config_file.__file__)
     )
     config_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(config_module)
-    config_dict = {
+    cfg = {
         name: getattr(config_module, name)
         for name in dir(config_module)
         if not name.startswith("__") and name.isupper()
     }
+
+    # start a new wandb run to track this script
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="YOLOv1_NuImages",
+        # name="pretrained_test1_resnet50",
+        # track hyperparameters and run metadata
+        config=cfg,
+        # mode="disabled",
+    )
+    cfg = DotDict(wandb.config)
+    # print(f"wandb.config: {cfg}")
+
+    if "DEVICE" in os.environ:
+        cfg.DEVICE = os.getenv("DEVICE")
 
     # Load model, optimizer and loss function
     if not cfg.PRE_TRAINED_CNN:
@@ -55,13 +70,28 @@ def main():
             split_size=cfg.SPLIT_SIZE,
             num_boxes=cfg.NUM_BOXES,
             num_classes=cfg.NUM_CLASSES,
+            fcl_size=cfg.FCL_SIZE,
+            dropout=cfg.DROPOUT,
         ).to(cfg.DEVICE)
+        TRANSFORMS = Compose([transforms.Resize(cfg.INPUT_SIZE), transforms.ToTensor()])
     else:
-        model = YOLOv1PreTrained(
+        model = YOLOv1PreTrainedResnet50(
             split_size=cfg.SPLIT_SIZE,
             num_boxes=cfg.NUM_BOXES,
             num_classes=cfg.NUM_CLASSES,
+            fcl_size=cfg.FCL_SIZE,
+            dropout=cfg.DROPOUT,
         ).to(cfg.DEVICE)
+        TRANSFORMS = Compose(
+            [
+                transforms.Resize(232),
+                transforms.CenterCrop(cfg.INPUT_SIZE),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        )
     optimizer = optim.Adam(
         model.parameters(), lr=cfg.LEARNING_RATE, weight_decay=cfg.WEIGHT_DECAY
     )
@@ -70,6 +100,8 @@ def main():
     print(
         f"The model is in device: {next(model.parameters()).device}"
     )  # Check if the model is in the GPU
+
+    wandb.watch(model)
 
     # Print summary of the model
     if cfg.PRINT_NN_SUMMARY:
@@ -87,18 +119,6 @@ def main():
             verbose=1,
         )
 
-    # start a new wandb run to track this script
-    wandb.init(
-        # set the wandb project where this run will be logged
-        project="YOLOv1_NuImages",
-        name="pretrained_test3_resnet18",
-        # track hyperparameters and run metadata
-        config=config_dict,
-        # mode="disabled",
-    )
-
-    wandb.watch(model)
-
     # Load model checkpoint if available
     if cfg.LOAD_MODEL_CHECKPOINT:
         load_checkpoint(
@@ -107,15 +127,21 @@ def main():
 
     # Load the training and validation datasets
     nuimages_train = NuImages(
-        dataroot=cfg.DATASET_DIR, version="v1.0-train", verbose=True, lazy=False
+        dataroot=cfg.DATASET_DIR,
+        version=cfg.TRAIN_DATASET_VERSION,
+        verbose=True,
+        lazy=False,
     )
     nuimages_val = NuImages(
-        dataroot=cfg.DATASET_DIR, version="v1.0-val", verbose=True, lazy=False
+        dataroot=cfg.DATASET_DIR,
+        version=cfg.VAL_DATASET_VERSION,
+        verbose=True,
+        lazy=False,
     )
 
     train_dataset = NuImagesDatasetYOLO(
         nuimages_train,
-        transform=cfg.TRANSFORM,
+        transform=TRANSFORMS,
         remove_empty=True,
         split_size=cfg.SPLIT_SIZE,
         num_boxes=cfg.NUM_BOXES,
@@ -124,7 +150,7 @@ def main():
 
     val_dataset = NuImagesDatasetYOLO(
         nuimages_val,
-        transform=cfg.TRANSFORM,
+        transform=TRANSFORMS,
         remove_empty=True,
         split_size=cfg.SPLIT_SIZE,
         num_boxes=cfg.NUM_BOXES,
