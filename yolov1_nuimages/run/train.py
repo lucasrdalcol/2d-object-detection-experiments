@@ -2,9 +2,8 @@
 
 import shutil
 import torch
-import torchvision.transforms as transforms
 import torch.optim as optim
-import torchvision.transforms.functional as FT
+import torchvision.transforms.v2 as transforms
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 import time
@@ -73,7 +72,13 @@ def main():
             fcl_size=cfg.FCL_SIZE,
             dropout=cfg.DROPOUT,
         ).to(cfg.DEVICE)
-        TRANSFORMS = Compose([transforms.Resize(cfg.INPUT_SIZE), transforms.ToTensor()])
+        TRANSFORMS = transforms.Compose(
+            [
+                transforms.Resize(cfg.INPUT_SIZE),
+                transforms.ToImage(), # Replacing transforms.ToTensor(), which is deprecated.
+                transforms.ToDtype(torch.float32, scale=True), # Replacing transforms.ToTensor(), which is deprecated.
+            ]
+        )
     else:
         model = YOLOv1PreTrainedResnet50(
             split_size=cfg.SPLIT_SIZE,
@@ -82,11 +87,12 @@ def main():
             fcl_size=cfg.FCL_SIZE,
             dropout=cfg.DROPOUT,
         ).to(cfg.DEVICE)
-        TRANSFORMS = Compose(
+        TRANSFORMS = transforms.Compose(
             [
                 transforms.Resize(232),
                 transforms.CenterCrop(cfg.INPUT_SIZE),
-                transforms.ToTensor(),
+                transforms.ToImage(), # Replacing transforms.ToTensor(), which is deprecated.
+                transforms.ToDtype(torch.float32, scale=True), # Replacing transforms.ToTensor(), which is deprecated.
                 transforms.Normalize(
                     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
                 ),

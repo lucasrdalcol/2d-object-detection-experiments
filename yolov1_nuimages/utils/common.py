@@ -7,37 +7,6 @@ import os
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 
 
-class Compose(object):
-    """
-    Composes several transforms together.
-    """
-
-    def __init__(self, transforms):
-        """
-        Args:
-            transforms: List of transforms to compose.
-        """
-        self.transforms = transforms
-
-    def __call__(self, img, bboxes, transform_bbox=False):
-        """
-        Args:
-            img: PIL image.
-            boxes: Bounding boxes in boundary coordinates, a tensor of dimensions (n_objects, 4).
-
-        Returns:
-            PIL image: Transformed PIL image.
-            tensor: Transformed bounding box of dimensions (n_objects, 4).
-        """
-        for t in self.transforms:
-            if transform_bbox:
-                img, bboxes = t(img, bboxes)
-            else:
-                img, bboxes = t(img), bboxes
-
-        return img, bboxes
-
-
 def seed_everything(seed=123):
     """
     Seeds basic parameters for reproductibility of results.
@@ -117,10 +86,12 @@ def transform_box_nuimages2yolov1(box, image_width, image_height):
 
     return box
 
+
 class DotDict(dict):
     """
     Dot notation access to dictionary attributes, recursively.
     """
+
     def __getattr__(self, attr):
         value = self.get(attr)
         if isinstance(value, dict):
