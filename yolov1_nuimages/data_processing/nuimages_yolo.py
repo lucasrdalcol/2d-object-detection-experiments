@@ -6,6 +6,7 @@ import torch
 from PIL import Image
 from nuimages import NuImages
 from nuimages.utils.utils import mask_decode
+
 sys.path.append(os.getenv("TWODOBJECTDETECTION_ROOT"))
 from yolov1_nuimages.utils.common import *
 
@@ -25,7 +26,16 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
 
     """
 
-    def __init__(self, nuimages: NuImages, transform=None, remove_empty=True, split_size=7, num_boxes=2, num_classes=25):
+    def __init__(
+        self,
+        nuimages: NuImages,
+        transform=None,
+        remove_empty=True,
+        split_size=7,
+        num_boxes=2,
+        num_classes=25,
+        decimation_factor=None,
+    ):
         # Check if the nuimages object contains the test set (no annotations)
         if len(nuimages.object_ann) == 0:
             self.has_ann = False
@@ -40,6 +50,22 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
         self.S = split_size
         self.B = num_boxes
         self.C = num_classes
+        print("=" * 6)
+
+        # Decimate samples based on the decimation factor
+        if decimation_factor is not None:
+            print(
+                f"[INFO] Decimating samples according to a decimation factor of {decimation_factor*100}%..."
+            )
+            num_samples_to_keep = int(len(self.nuimages.sample) * decimation_factor)
+            samples_after_decimation = random.sample(
+                self.nuimages.sample, num_samples_to_keep
+            )
+            print(
+                f"[INFO] Done. {len(samples_after_decimation)} samples remaining out of {len(self.nuimages.sample)} after decimation."
+            )
+        else:
+            samples_after_decimation = self.nuimages.sample
 
         # If training, remove any samples which contain no annotations
         if remove_empty and self.has_ann:
@@ -47,13 +73,17 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
 
             sd_tokens_with_objects = set()
             for object_ann in self.nuimages.object_ann:
-                sd_tokens_with_objects.add(object_ann["sample_data_token"])
+                bbox = object_ann["bbox"]
+                width = bbox[2] - bbox[0]
+                height = bbox[3] - bbox[1]
+                if width > 0 and height > 0:
+                    sd_tokens_with_objects.add(object_ann["sample_data_token"])
 
             self.samples_with_objects = []
-            for idx, sample in enumerate(self.nuimages.sample):
+            for sample in samples_after_decimation:
                 sd_token = sample["key_camera_token"]
                 if sd_token in sd_tokens_with_objects:
-                    self.samples_with_objects.append(idx)
+                    self.samples_with_objects.append(sample)
 
             print(
                 f"[INFO] Done. {len(self.samples_with_objects)} samples remaining out of {len(self.nuimages.sample)}."
@@ -61,7 +91,7 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
 
         else:
             # Keep all samples if remove_empty set to false
-            self.samples_with_objects = [i for i in range(len(self.nuimages.sample))]
+            self.samples_with_objects = self.nuimages.sample
 
         # Create lookup table to convert category name to an int index
         # Speeds up creating annotations
@@ -86,6 +116,8 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
             if width > 0 and height > 0:
                 self.object_anns_dict[object_sd_token].append(object_ann)
 
+        print("=" * 6)
+
     def __len__(self):
         return len(self.samples_with_objects)
 
@@ -109,7 +141,7 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
             Dictionary containing the object annotations associated with this image.
         """
         # Get a sample - i.e. an annotated camera image
-        sample = self.nuimages.sample[self.samples_with_objects[idx]]
+        sample = self.samples_with_objects[idx]
         # Get the associated sample data, representing the image associated with the sample
         sd_token = sample["key_camera_token"]
         sample_data = self.nuimages.get("sample_data", sd_token)
@@ -128,13 +160,25 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
         # Get bounding boxes
         # Note object_ann['bbox'] gives the bounding box as [x0, y0, x1, y1]
         # Convert to [x, y, w, h] for YOLOv1 as percentages of the image size
-        raw_boxes_nuimages = torch.as_tensor([object_ann["bbox"] for object_ann in object_anns], dtype=torch.float32)
+        raw_boxes_nuimages = torch.as_tensor(
+            [object_ann["bbox"] for object_ann in object_anns], dtype=torch.float32
+        )
 
-        boxes = torch.as_tensor([transform_box_nuimages2yolov1(box, sample_data["width"], sample_data["height"]) for box in raw_boxes_nuimages])
+        boxes = torch.as_tensor(
+            [
+                transform_box_nuimages2yolov1(
+                    box, sample_data["width"], sample_data["height"]
+                )
+                for box in raw_boxes_nuimages
+            ]
+        )
 
         # Get class labels for each bounding box
         category_tokens = [object_ann["category_token"] for object_ann in object_anns]
-        categories = [self.nuimages.get("category", category_token) for category_token in category_tokens]
+        categories = [
+            self.nuimages.get("category", category_token)
+            for category_token in category_tokens
+        ]
         class_labels = torch.as_tensor(
             [self._category_name_to_id[categorie["name"]] for categorie in categories],
             dtype=torch.int64,
@@ -158,8 +202,10 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
             if label_matrix[i, j, self.C] == 0:
                 # Set that there exists an object
                 label_matrix[i, j, self.C] = 1
-                box_coordinates = torch.tensor([x_cell, y_cell, width_cell, height_cell])
-                label_matrix[i, j, self.C+1:self.C+5] = box_coordinates
+                box_coordinates = torch.tensor(
+                    [x_cell, y_cell, width_cell, height_cell]
+                )
+                label_matrix[i, j, self.C + 1 : self.C + 5] = box_coordinates
                 # Set one hot encoding for class_label
                 label_matrix[i, j, class_label] = 1
 

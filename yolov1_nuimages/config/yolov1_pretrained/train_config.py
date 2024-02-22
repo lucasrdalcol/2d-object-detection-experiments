@@ -10,25 +10,25 @@ from yolov1_nuimages.utils.common import *
 # Hyperparameters
 
 LEARNING_RATE = 2e-5
-DEVICE = "cuda:1" if torch.cuda.is_available() else "cpu"
+DEVICE = "cuda:2" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 64
 WEIGHT_DECAY = 0
-EPOCHS = 40
+EPOCHS = 5
 NUM_WORKERS = 14
-PIN_MEMORY = True
+PIN_MEMORY = True if "cuda" in DEVICE else False
 SPLIT_SIZE = 7
 NUM_BOXES = 2
 NUM_CLASSES = 25
 PRE_TRAINED_CNN = True
 INPUT_SIZE = (224, 224)
-FCL_SIZE = 2048
+FCL_SIZE = 512
 DROPOUT = 0.5
 SHOW_BATCH_IMAGES = False
 PRINT_NN_SUMMARY = False
 LOAD_MODEL_CHECKPOINT = False
 LOAD_MODEL_CHECKPOINT_FILENAME = "test.pth.tar"
 SAVE_MODEL = True
-SAVE_MODEL_FILENAME = "sweep_test.pth"
+SAVE_MODEL_FILENAME = "decimate_test.pth"
 PROJECT_NAME = "2d-object-detection-experiments"
 PROJECT_DIR = os.path.join(os.getenv("PHD_REPOSITORIES"), PROJECT_NAME)
 DATASET_DIR = os.path.join(
@@ -43,4 +43,4 @@ VISUALIZE_RESULTS = False
 SAVE_RESULTS = False
 SAVE_RESULTS_FOLDER = "sweep_test"
 OVERWRITE_RESULTS_FOLDER = True
-DECIMATION_FACTOR = None  # Set to None to use all data
+DECIMATION_FACTOR = 0.01  # Set to None to use all data

@@ -152,6 +152,7 @@ def main():
         split_size=cfg.SPLIT_SIZE,
         num_boxes=cfg.NUM_BOXES,
         num_classes=cfg.NUM_CLASSES,
+        decimation_factor=cfg.DECIMATION_FACTOR,
     )
 
     val_dataset = NuImagesDatasetYOLO(
@@ -161,6 +162,7 @@ def main():
         split_size=cfg.SPLIT_SIZE,
         num_boxes=cfg.NUM_BOXES,
         num_classes=cfg.NUM_CLASSES,
+        decimation_factor=cfg.DECIMATION_FACTOR,
     )
 
     # Create training and validation dataloaders
