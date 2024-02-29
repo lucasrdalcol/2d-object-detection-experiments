@@ -1,4 +1,5 @@
 import torch
+import torchvision.transforms.v2 as transforms
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -80,8 +81,6 @@ def wandb_bounding_boxes(raw_image, filename, bboxes, class_id_to_label):
     all_boxes = []
     # plot each bounding box for this image
     for box in bboxes:
-        if box[1] == 0.0:
-            continue
         # get coordinates and labels
         box_data = {
             "position": {
@@ -105,3 +104,16 @@ def wandb_bounding_boxes(raw_image, filename, bboxes, class_id_to_label):
         },
     )
     return box_image
+
+class Denormalize(object):
+    def __init__(self, mean, std, inplace=False):
+        self.mean = mean
+        self.demean = [-m/s for m, s in zip(mean, std)]
+        self.std = std
+        self.destd = [1/s for s in std]
+        self.inplace = inplace
+
+    def __call__(self, tensor):
+        tensor = transforms.Normalize(tensor, self.demean, self.destd, self.inplace)
+        # clamp to get rid of numerical errors
+        return torch.clamp(tensor, 0.0, 1.0)

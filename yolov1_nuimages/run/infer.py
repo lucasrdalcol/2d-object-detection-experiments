@@ -84,7 +84,7 @@ def main():
         test_dataloader,
         model,
         iou_threshold=0.5,
-        threshold=0.4,
+        prob_threshold=0.4,
         device=cfg.DEVICE,
         progress_bar=True,
     )  # Get the predictions and targets bboxes to compute mAP for the test dataset

@@ -29,7 +29,7 @@ def train_epoch(train_dataloader, model, optimizer, loss_fn, device="cuda"):
     losses = []
 
     # Iterate over the training data
-    for batch_idx, (inputs_x, labels_y, _) in enumerate(train_dataloader_loop):
+    for batch_idx, (inputs_x, labels_y, _, _) in enumerate(train_dataloader_loop):
         inputs_x, labels_y = inputs_x.to(device), labels_y.to(
             device
         )  # Move data to device (GPU if available)
@@ -37,14 +37,14 @@ def train_epoch(train_dataloader, model, optimizer, loss_fn, device="cuda"):
         # forward pass: Feed inputs to the model and compute loss.
         predictions = model(inputs_x)  # Feed inputs to the model to get predictions
         loss = loss_fn(predictions, labels_y)  # calculate loss
-        losses.append(loss.item())
+        losses.append(loss.detach().item())
 
         # backward pass: compute gradient of the loss with respect to model parameters
         optimizer.zero_grad()  # zero out the gradients from the previous step
         loss.backward()  # backpropagate the loss
         optimizer.step()  # perform a single optimization step (model parameter update)
 
-        train_dataloader_loop.set_postfix(loss=loss.item())  # update progress bar
+        train_dataloader_loop.set_postfix(loss=loss.detach().item())  # update progress bar
 
         # Clear memory
         del loss, predictions
@@ -90,7 +90,7 @@ def validate_epoch(
 
     # Iterate over the validation data
     with torch.no_grad():  # disable gradient calculation
-        for batch_idx, (inputs_x, labels_y, _) in enumerate(val_dataloader_loop):
+        for batch_idx, (inputs_x, labels_y, _, _) in enumerate(val_dataloader_loop):
             # forward pass: Feed inputs to the model and compute loss.
             # No need to compute gradients in validation phase (backpropagation)
             inputs_x, labels_y = inputs_x.to(device), labels_y.to(
@@ -98,9 +98,9 @@ def validate_epoch(
             )  # Move data to device (GPU if available)
             predictions = model(inputs_x)  # Feed inputs to the model to get predictions
             loss = loss_fn(predictions, labels_y)  # calculate loss
-            losses.append(loss.item())
+            losses.append(loss.detach().item())
 
-            val_dataloader_loop.set_postfix(loss=loss.item())  # update progress bar
+            val_dataloader_loop.set_postfix(loss=loss.detach().item())  # update progress bar
 
             batch_size = inputs_x.shape[0]
             true_bboxes = cellboxes_to_boxes(labels_y)
@@ -137,6 +137,7 @@ def validate_epoch(
     print(f"Val mean loss: {mean_loss}")
 
     # Compute mean average precision
+    print(f"Computing mean average precision...")
     mean_avg_prec = mean_average_precision(
         all_pred_boxes,
         all_true_boxes,
@@ -151,7 +152,7 @@ def get_bboxes(
     dataloader,
     model,
     iou_threshold,
-    threshold,
+    prob_threshold,
     pred_format="cells",
     box_format="midpoint",
     device="cuda",
@@ -182,7 +183,7 @@ def get_bboxes(
     if progress_bar:
         dataloader_loop = tqdm(dataloader)
 
-    for batch_idx, (inputs_x, labels_y, _) in enumerate(
+    for batch_idx, (inputs_x, labels_y, _, _) in enumerate(
         dataloader_loop if progress_bar else dataloader
     ):
         inputs_x = inputs_x.to(device)
@@ -199,7 +200,7 @@ def get_bboxes(
             nms_boxes = non_max_suppression(
                 pred_bboxes[idx],
                 iou_threshold=iou_threshold,
-                prob_threshold=threshold,
+                prob_threshold=prob_threshold,
                 box_format=box_format,
             )
 
@@ -212,7 +213,7 @@ def get_bboxes(
 
             for true_box in true_bboxes[idx]:
                 # many will get converted to 0 pred
-                if true_box[1] > threshold:
+                if true_box[1] > prob_threshold:
                     all_true_boxes.append([train_idx] + true_box)
 
             train_idx += 1

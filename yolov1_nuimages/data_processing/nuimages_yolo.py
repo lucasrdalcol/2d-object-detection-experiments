@@ -144,7 +144,12 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
         sample = self.samples_with_objects[idx]
         # Get the associated sample data, representing the image associated with the sample
         sd_token = sample["key_camera_token"]
+        # print(f"sample: {sample}")
+        # print(f"sample length: {len(sample)}")
+        # print(f"sd_token: {sd_token}")
+        # print(f"sd_token length: {len(sd_token)}")
         sample_data = self.nuimages.get("sample_data", sd_token)
+        # print(f"sample_data: {sample_data}")
         filename = sample_data["filename"]
 
         # Read the image file
@@ -156,6 +161,8 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
 
         # Get the object annotations corresponding to this sample data only
         object_anns = self.object_anns_dict[sd_token]
+        # print(f"object_anns: {object_anns}")
+        # print(f"object_anns length: {len(object_anns)}")
 
         # Get bounding boxes
         # Note object_ann['bbox'] gives the bounding box as [x0, y0, x1, y1]
@@ -173,6 +180,9 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
             ]
         )
 
+        # print(f"boxes: {boxes}")
+        # print(f"boxes length: {len(boxes)}")
+
         # Get class labels for each bounding box
         category_tokens = [object_ann["category_token"] for object_ann in object_anns]
         categories = [
@@ -184,12 +194,16 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
             dtype=torch.int64,
         )
 
+        # print(f"class_labels: {class_labels}")
+        # print(f"class_labels length: {len(class_labels)}")
+
         if self.transform:
             image, boxes = self.transform(image, boxes)
 
         # Convert box coordinates (for entire image) to cell coordinates (for YOLOv1 grid division).
         label_matrix = torch.zeros((self.S, self.S, self.C + self.B * 5))
-        for class_label, box in zip(class_labels, boxes):
+        for idx, (class_label, box) in enumerate(zip(class_labels, boxes)):
+            # print(f"box {idx}: {box}")
             x, y, width, height = box.tolist()
             class_label = int(class_label)
             # i,j represents the cell row and cell column in the image grid.
@@ -200,6 +214,7 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
             # If no object already found for specific cell i,j, use the box and assign the box relative to the cell.
             # Note: This means we restrict to ONE object per cell!
             if label_matrix[i, j, self.C] == 0:
+                # print(f"Putting box {idx} in label matrix")
                 # Set that there exists an object
                 label_matrix[i, j, self.C] = 1
                 box_coordinates = torch.tensor(
@@ -209,4 +224,4 @@ class NuImagesDatasetYOLO(torch.utils.data.Dataset):
                 # Set one hot encoding for class_label
                 label_matrix[i, j, class_label] = 1
 
-        return image, label_matrix, filename
+        return image, label_matrix, filename, sd_token
