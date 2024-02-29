@@ -24,14 +24,14 @@ def train_epoch(train_dataloader, model, optimizer, loss_fn, device="cuda"):
         # forward pass: Feed inputs to the model and compute loss.
         predictions = model(inputs_x)  # Feed inputs to the model to get predictions
         loss = loss_fn(predictions, labels_y)  # calculate loss
-        losses.append(loss.item())
+        losses.append(loss.detach().item())
 
         # backward pass: compute gradient of the loss with respect to model parameters
         optimizer.zero_grad()  # zero out the gradients from the previous step
         loss.backward()  # backpropagate the loss
         optimizer.step()  # perform a single optimization step (model parameter update)
 
-        train_dataloader_loop.set_postfix(loss=loss.item())  # update progress bar
+        train_dataloader_loop.set_postfix(loss=loss.detach().item())  # update progress bar
         
         # Clear memory
         del loss, predictions
@@ -85,9 +85,9 @@ def validate_epoch(
             )  # Move data to device (GPU if available)
             predictions = model(inputs_x)  # Feed inputs to the model to get predictions
             loss = loss_fn(predictions, labels_y)  # calculate loss
-            losses.append(loss.item())
+            losses.append(loss.detach().item())
 
-            val_dataloader_loop.set_postfix(loss=loss.item())  # update progress bar
+            val_dataloader_loop.set_postfix(loss=loss.detach().item())  # update progress bar
 
             batch_size = inputs_x.shape[0]
             true_bboxes = cellboxes_to_boxes(labels_y)

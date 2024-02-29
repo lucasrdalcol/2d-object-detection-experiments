@@ -11,7 +11,7 @@ from yolov1_nuimages.utils.common import *
 
 LEARNING_RATE = 2e-5
 DEVICE = "cuda:2" if torch.cuda.is_available() else "cpu"
-BATCH_SIZE = 64
+BATCH_SIZE = 128
 WEIGHT_DECAY = 0.001
 EPOCHS = 135
 NUM_WORKERS = 14
@@ -21,7 +21,7 @@ NUM_BOXES = 2
 NUM_CLASSES = 25
 PRE_TRAINED_CNN = True
 INPUT_SIZE = (224, 224)
-FCL_SIZE = 512
+FCL_SIZE = 2048
 DROPOUT = 0.5
 SHOW_BATCH_IMAGES = False
 PRINT_NN_SUMMARY = False

@@ -80,8 +80,7 @@ def wandb_bounding_boxes(raw_image, filename, bboxes, class_id_to_label):
     all_boxes = []
     # plot each bounding box for this image
     for box in bboxes:
-        if box[1] == 0.0:
-            continue
+        
         # get coordinates and labels
         box_data = {
             "position": {

@@ -91,7 +91,7 @@ def main():
     wandb.init(
         # set the wandb project where this run will be logged
         project="YOLOv1",
-        name="pretrained_test2_resnet50",
+        # name="pretrained_test2_resnet50",
         # track hyperparameters and run metadata
         config=config_dict,
         # mode="disabled",
@@ -107,7 +107,7 @@ def main():
 
     # Load the training and validation datasets
     train_dataset = PascalVOCDatasetYOLO(
-        os.path.join(cfg.DATASET_DIR, "train.csv"),
+        os.path.join(cfg.DATASET_DIR, "100examples.csv"),
         img_dir=os.path.join(cfg.DATASET_DIR, "images"),
         label_dir=os.path.join(cfg.DATASET_DIR, "labels"),
         transform=cfg.TRANSFORM,
@@ -115,7 +115,7 @@ def main():
     )
 
     val_dataset = PascalVOCDatasetYOLO(
-        os.path.join(cfg.DATASET_DIR, "test.csv"),
+        os.path.join(cfg.DATASET_DIR, "100examples.csv"),
         img_dir=os.path.join(cfg.DATASET_DIR, "images"),
         label_dir=os.path.join(cfg.DATASET_DIR, "labels"),
         transform=cfg.TRANSFORM,
@@ -143,22 +143,62 @@ def main():
 
     # Visualize the transformed images for a batch
     if cfg.SHOW_BATCH_IMAGES:
-        input_images, label_matrices, filenames = next(iter(val_dataloader))
-        for i in range(len(input_images)):
-            # Get the i-th image
-            image = (
-                input_images[i].cpu().numpy().transpose(1, 2, 0)
-            )  # Change from (channels, height, width) to (height, width, channels)
-            print(image)
-            # Create a new figure
-            plt.figure()
-            # Plot the image
-            plt.imshow(image)
-            plt.axis("on")  # Turn on the axes
-            # Add a title
-            plt.title(filenames[i])
-            # Show the plot
-            plt.show()
+        # make sure model is in eval before get bboxes
+        model.eval()
+
+        for batch_idx, (inputs_x, labels_y, filenames) in enumerate(
+            val_dataloader
+        ):
+            inputs_x = inputs_x.to(cfg.DEVICE)
+            labels_y = labels_y.to(cfg.DEVICE)
+
+            with torch.no_grad():
+                predictions = model(inputs_x)
+
+            batch_size = inputs_x.shape[0]
+            true_bboxes = cellboxes_to_boxes(labels_y)
+            pred_bboxes = cellboxes_to_boxes(predictions)
+
+            for idx in range(batch_size):
+                pred_bboxes_per_image = non_max_suppression(
+                    pred_bboxes[idx],
+                    iou_threshold=0.5,
+                    prob_threshold=0.4,
+                    box_format="midpoint",
+                )
+
+                true_bboxes_per_image = [
+                    true_bbox for true_bbox in true_bboxes[idx] if true_bbox[1] > 0.4
+                ]
+
+                # print(f"pred_bboxes_per_image: {pred_bboxes_per_image}")
+                # print(f"true_bboxes_per_image: {true_bboxes_per_image}")
+                # print(f"true_bboxes_per_image length: {len(true_bboxes_per_image)}")
+
+                # Get the i-th image
+                image = (
+                    inputs_x[idx].cpu().numpy().transpose(1, 2, 0)
+                )  # Change from (channels, height, width) to (height, width, channels)
+                # print(image)
+                # Create a new figure
+                plt.figure()
+                # Plot the image
+                plt.imshow(image)
+                plt.axis("on")  # Turn on the axes
+                # Add a title
+                plt.title(filenames[idx])
+                # Show the plot
+                plt.show()
+
+                plt_image = plot_comparison_image(
+                    inputs_x[idx].permute(1, 2, 0).to("cpu"),
+                    filenames[idx],
+                    pred_bboxes_per_image,
+                    true_bboxes_per_image,
+                )
+                plt_image.show()
+                plt_image.close()
+        model.train()
 
     # Train the model
     _ = next(
@@ -246,35 +286,50 @@ def main():
         if cfg.VISUALIZE_RESULTS:
             print(f"Visualizing validation results...")
 
+        model.eval()
         for inputs_x, labels_y, filenames in val_dataloader:
+
             inputs_x = inputs_x.to(cfg.DEVICE)
             labels_y = labels_y.to(cfg.DEVICE)
-            for idx in range(inputs_x.shape[0]):
-                pred_bboxes = cellboxes_to_boxes(model(inputs_x))
-                true_bboxes = cellboxes_to_boxes(labels_y)
-                pred_bboxes_idx = non_max_suppression(
+
+            with torch.no_grad():
+                predictions = model(inputs_x)
+
+            batch_size = inputs_x.shape[0]
+            true_bboxes = cellboxes_to_boxes(labels_y)
+            pred_bboxes = cellboxes_to_boxes(predictions)
+
+            for idx in range(batch_size):
+                pred_bboxes_per_image = non_max_suppression(
                     pred_bboxes[idx],
                     iou_threshold=0.5,
                     prob_threshold=0.4,
                     box_format="midpoint",
                 )
-                true_bboxes_idx = true_bboxes[idx]
-                filename_idx = filenames[idx]
-                plt = plot_comparison_image(
+
+                true_bboxes_per_image = [
+                    true_bbox for true_bbox in true_bboxes[idx] if true_bbox[1] > 0.4
+                ]
+
+                filename_per_image = filenames[idx]
+
+                plt_image = plot_comparison_image(
                     inputs_x[idx].permute(1, 2, 0).to("cpu"),
-                    filename_idx,
-                    pred_bboxes_idx,
-                    true_bboxes_idx,
+                    filename_per_image,
+                    pred_bboxes_per_image,
+                    true_bboxes_per_image,
                 )
                 if cfg.SAVE_RESULTS:
                     plt.savefig(
                         os.path.join(
                             results_folder_path,
-                            f"{filename_idx.split('.')[0]}.png",
+                            f"{filename_per_image.split('.')[0]}.png",
                         )
                     )
                 if cfg.VISUALIZE_RESULTS:
                     plt.show()
+
+        model.train()
 
     # Log the images and model predictions to wandb
     # this is the order in which my classes will be displayed
@@ -301,32 +356,44 @@ def main():
         19: "tvmonitor",
     }
 
+    model.eval()
     for inputs_x, labels_y, filenames in val_dataloader:
+
         inputs_x = inputs_x.to(cfg.DEVICE)
         labels_y = labels_y.to(cfg.DEVICE)
-        for idx in range(inputs_x.shape[0]):
-            pred_bboxes = cellboxes_to_boxes(model(inputs_x))
-            true_bboxes = cellboxes_to_boxes(labels_y)
-            pred_bboxes_idx = non_max_suppression(
+
+        with torch.no_grad():
+            predictions = model(inputs_x)
+
+        batch_size = inputs_x.shape[0]
+        true_bboxes = cellboxes_to_boxes(labels_y)
+        pred_bboxes = cellboxes_to_boxes(predictions)
+
+        for idx in range(batch_size):
+            pred_bboxes_per_image = non_max_suppression(
                 pred_bboxes[idx],
                 iou_threshold=0.5,
                 prob_threshold=0.4,
                 box_format="midpoint",
             )
-            true_bboxes_idx = true_bboxes[idx]
-            filename_idx = filenames[idx]
+
+            true_bboxes_per_image = [
+                true_bbox for true_bbox in true_bboxes[idx] if true_bbox[1] > 0.4
+            ]
+
+            filename_per_image = filenames[idx]
 
             # log to wandb: raw image, predictions, and dictionary of class labels for each class id
             wandb_predbbox_image = wandb_bounding_boxes(
                 inputs_x[idx].permute(1, 2, 0).to("cpu").numpy(),
-                filename_idx,
-                pred_bboxes_idx,
+                filename_per_image,
+                pred_bboxes_per_image,
                 class_id_to_label,
             )
             wandb_truebbox_image = wandb_bounding_boxes(
                 inputs_x[idx].permute(1, 2, 0).to("cpu").numpy(),
-                filename_idx,
-                true_bboxes_idx,
+                filename_per_image,
+                true_bboxes_per_image,
                 class_id_to_label,
             )
 
@@ -336,6 +403,8 @@ def main():
                     "true_bboxes": wandb_truebbox_image,
                 }
             )
+
+    model.train()
 
 
 if __name__ == "__main__":
